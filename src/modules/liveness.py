@@ -30,6 +30,11 @@ class LivenessDetector:
             }
         return self.states[track_id]
 
+    def reset_state(self, track_id):
+        """Reset state untuk track_id tertentu"""
+        if track_id in self.states:
+            del self.states[track_id]
+
     def calculate_ear(self, eye_landmarks):
         """Hitung Eye Aspect Ratio (EAR)"""
         # Jarak vertikal
@@ -41,22 +46,17 @@ class LivenessDetector:
         return ear
 
     def check_liveness(self, track_id, face_obj):
-        """
-        Cek liveness dari face object InsightFace
-        Returns: (is_live, reason)
-        """
         state = self._get_state(track_id)
 
         if face_obj is None:
+            print("DEBUG: face_obj None")
             return False, "no_face"
 
-        # Ambil landmark dari InsightFace
         landmarks = face_obj.landmark_2d_106
         if landmarks is None:
+            print("DEBUG: landmarks None")
             return False, "no_landmark"
 
-        # Landmark mata dari InsightFace buffalo_l
-        # Mata kiri: index 33-38, Mata kanan: index 87-92
         try:
             left_eye = landmarks[33:39]
             right_eye = landmarks[87:93]
@@ -65,7 +65,6 @@ class LivenessDetector:
             right_ear = self.calculate_ear(right_eye)
             ear = (left_ear + right_ear) / 2.0
 
-            # Deteksi kedipan
             if ear < self.ear_threshold:
                 state['ear_counter'] += 1
             else:
@@ -73,29 +72,31 @@ class LivenessDetector:
                     state['blink_count'] += 1
                 state['ear_counter'] = 0
 
-            # Deteksi pergerakan kepala
             nose_tip = landmarks[86]
             state['head_positions'].append(nose_tip)
 
             head_moved = False
-            if len(state['head_positions']) >= 10:
+            if len(state['head_positions']) >= 5:
                 positions = np.array(state['head_positions'])
                 movement = np.max(positions, axis=0) - np.min(positions, axis=0)
                 head_moved = np.any(movement > self.head_move_threshold)
 
-            # Liveness = blink terdeteksi ATAU kepala bergerak
+            # Debug print
+            print(f"DEBUG: EAR={ear:.3f} blink={state['blink_count']} head_moved={head_moved} positions={len(state['head_positions'])}")
+
             if state['blink_count'] >= 1 or head_moved:
                 state['is_live'] = True
 
             return state['is_live'], "ok"
 
         except Exception as e:
+            print(f"DEBUG: Exception: {e}")
             return False, str(e)
 
-    def reset_state(self, track_id):
-        """Reset state untuk track_id tertentu"""
-        if track_id in self.states:
-            del self.states[track_id]
+        def reset_state(self, track_id):
+            """Reset state untuk track_id tertentu"""
+            if track_id in self.states:
+                del self.states[track_id]
 
 
 if __name__ == "__main__":

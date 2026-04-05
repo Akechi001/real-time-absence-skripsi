@@ -24,16 +24,16 @@ INSIGHTFACE_MODEL = "buffalo_l"
 FACE_SIMILARITY_THRESHOLD = 0.4  # threshold cosine similarity
 
 # Liveness
-EAR_THRESHOLD = 0.25        # threshold kedipan mata
-EAR_CONSEC_FRAMES = 2       # frame berturut-turut untuk deteksi kedip
-HEAD_MOVE_THRESHOLD = 10    # threshold pergerakan kepala (pixel)
-LIVENESS_WINDOW = 30        # jumlah frame untuk verifikasi liveness
+EAR_THRESHOLD = 0.25
+EAR_CONSEC_FRAMES = 1      # dari 2
+HEAD_MOVE_THRESHOLD = 3    # dari 10
+LIVENESS_WINDOW = 8        # dari 30
 
 # Kamera
-CAMERA_INDEX = 0            # index kamera (0 = webcam default)
+CAMERA_INDEX = 0
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
-FPS_SAMPLING = 10           # frame per detik yang diproses
+FPS_SAMPLING = 10
 
 # Cooldown absensi (detik)
 COOLDOWN_SECONDS = 60
