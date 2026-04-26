@@ -7,26 +7,36 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import config
 
+
 class FaceRecognizer:
     def __init__(self):
-        self.app = insightface.app.FaceAnalysis(name=config.INSIGHTFACE_MODEL)
-        self.app.prepare(ctx_id=-1)  # CPU
+        # Hanya load model yang dibutuhkan untuk percepat inference
+        # detection: untuk deteksi wajah
+        # recognition: untuk embedding ArcFace
+        # landmark_2d_106: untuk liveness EAR + head movement
+        self.app = insightface.app.FaceAnalysis(
+            name=config.INSIGHTFACE_MODEL,
+            allowed_modules=['detection', 'recognition', 'landmark_2d_106']
+        )
+        # det_size lebih kecil untuk speed up (default 640x640)
+        self.app.prepare(ctx_id=-1, det_size=(320, 320))
         self.threshold = config.FACE_SIMILARITY_THRESHOLD
         print("✓ FaceRecognizer initialized")
 
-
-    def get_embedding(self, frame, bbox):
+    def get_embedding(self, frame, bbox, faces_insightface=None):
         """
-        Ekstrak embedding wajah dari frame penuh
-        menggunakan bbox sebagai referensi posisi
+        Ekstrak embedding wajah dari frame
+        Jika faces_insightface diberikan, pakai itu (hindari double call)
         """
         x1, y1, x2, y2 = bbox[:4]
 
-        # Berikan frame penuh ke InsightFace
-        faces = self.app.get(frame)
+        # Pakai faces_insightface yang sudah ada, atau panggil app.get
+        if faces_insightface is None:
+            faces = self.app.get(frame)
+        else:
+            faces = faces_insightface
 
         if not faces:
-            print("InsightFace tidak mendeteksi wajah")
             return None
 
         # Cari wajah yang paling overlap dengan bbox YOLO
@@ -35,8 +45,6 @@ class FaceRecognizer:
 
         for face in faces:
             fx1, fy1, fx2, fy2 = map(int, face.bbox)
-
-            # Hitung overlap
             ox1 = max(x1, fx1)
             oy1 = max(y1, fy1)
             ox2 = min(x2, fx2)
@@ -49,23 +57,16 @@ class FaceRecognizer:
                     best_face = face
 
         if best_face is None:
-            print("Tidak ada wajah yang overlap dengan bbox YOLO")
             return None
 
         return best_face.embedding
 
     def cosine_similarity(self, emb1, emb2):
-        """Hitung cosine similarity antara dua embedding"""
         emb1 = emb1 / np.linalg.norm(emb1)
         emb2 = emb2 / np.linalg.norm(emb2)
         return float(np.dot(emb1, emb2))
 
     def identify(self, embedding, templates):
-        """
-        Cocokkan embedding dengan template database
-        templates: list of dict {id_karyawan, nama, embedding}
-        Returns: (id_karyawan, nama, confidence) atau None
-        """
         if embedding is None or not templates:
             return None
 
