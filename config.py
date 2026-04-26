@@ -30,7 +30,11 @@ HEAD_MOVE_THRESHOLD = 15
 LIVENESS_WINDOW = 8
 
 # Kamera
-CAMERA_INDEX = 0
+CAMERA_INDEX = 0  # Kamera utama untuk attendance (di pintu masuk)
+ENROLLMENT_CAMERA_INDEX = None  # Kamera enrollment (di ruang ICT)
+                                # None = pakai CAMERA_INDEX yang sama (Skenario A: 1 kamera)
+                                # 1 = pakai webcam external (Skenario B: 2 kamera)
+
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS_SAMPLING = 20
