@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.absensi.midnight.plist — launchd job untuk resolve absensi harian.
+
+  GANTI PATH "__PROJECT_ROOT__" sesuai lokasi project di laptop kamu
+  sebelum copy ke ~/Library/LaunchAgents/.
+
+  Default di repo ini: /Users/kevin/IdeaProjects/real-time-absence-skripsi
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.absensi.midnight</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PROJECT_ROOT__/venv/bin/python</string>
+        <string>__PROJECT_ROOT__/scripts/midnight_resolve.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__PROJECT_ROOT__</string>
+
+    <!-- Jalan tiap hari jam 00:05 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>0</integer>
+        <key>Minute</key>
+        <integer>5</integer>
+    </dict>
+
+    <!-- Kalau laptop lagi tidur jam 00:05, jalankan begitu bangun -->
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__PROJECT_ROOT__/logs/midnight_resolve.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__PROJECT_ROOT__/logs/midnight_resolve.err.log</string>
+</dict>
+</plist>

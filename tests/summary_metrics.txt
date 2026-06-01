@@ -1,0 +1,20 @@
+METRIK PENGUJIAN — Sistem Absensi Wajah
+STIE Ciputra Makassar — Skripsi Enrico Kevin Ariantho
+============================================================
+
+Tanggal pengujian       : 2026-05-28 16:24
+Jumlah karyawan diuji   : 1
+Total foto diuji        : 3
+
+BIOMETRIC PIPELINE
+------------------------------------------------------------
+Face Detection Rate           : 100.0% (3/3)
+Recognition Accuracy          : 100.0% (3/3 dari wajah ter-detect)
+Anti-Spoofing Pass (genuine)  : 100.0% (3/3)
+
+PERFORMA
+------------------------------------------------------------
+Latency rata-rata             : 323 ms
+Latency minimum               : 226 ms
+Latency maximum               : 466 ms
+Throughput estimasi (1/avg)   : 3.1 foto/detik

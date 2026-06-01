@@ -1,0 +1,55 @@
+==============================================================================================================
+BIOMETRIC PIPELINE TESTING — Sistem Absensi Wajah
+STIE Ciputra Makassar — Skripsi Enrico Kevin Ariantho (0806022210012)
+Dijalankan: 2026-05-28 16:23:59
+==============================================================================================================
+
+Loading models...
+
+Querying database...
+  Total karyawan internal     : 14
+  Aktif (status_aktif=TRUE)   : 6
+  Punya template wajah        : 6
+  Templates loaded (active)   : 6
+
+Karyawan aktif yang akan ditest    : 1
+Karyawan aktif yang di-skip (no photos): 5
+  - id=2, nama=Johan Reinaldo (folder data/photos/2/ tidak ada)
+  - id=3, nama=Hendra Okta (folder data/photos/3/ tidak ada)
+  - id=4, nama=Dewa anugerah (folder data/photos/4/ tidak ada)
+  - id=8, nama=richard (folder data/photos/8/ tidak ada)
+  - id=14, nama=Pak Juan (folder data/photos/14/ tidak ada)
+
++------------------------------+------------------+--------+------------+------------+------------------+-------------+
+| Karyawan                     | Foto             | Wajah  | Confidence | ID Benar?  | Anti-Spoof       | Latency(ms) |
++------------------------------+------------------+--------+------------+------------+------------------+-------------+
+| Enrico Kevin Ariantho        | foto_frontal     | 1      | 0.917      | YA         | REAL 1.00        | 466         |
+| Enrico Kevin Ariantho        | foto_kanan       | 1      | 0.922      | YA         | REAL 1.00        | 226         |
+| Enrico Kevin Ariantho        | foto_kiri        | 1      | 0.935      | YA         | REAL 1.00        | 277         |
++------------------------------+------------------+--------+------------+------------+------------------+-------------+
+
+==============================================================================================================
+RINGKASAN STATISTIK
+==============================================================================================================
+
+Total foto diuji                            : 3
+Face Detection Rate                          : 3/3 = 100.0%
+Embedding Extraction Success                 : 3/3 = 100.0%
+Embedding Shape Valid (512-dim)              : 3/3 = 100.0%
+Recognition Accuracy (vs total foto)         : 3/3 = 100.0%
+Recognition Accuracy (vs wajah ter-detect)   : 3/3 = 100.0%
+Anti-Spoof Pass Rate (genuine photos)        : 3/3 = 100.0%
+Average Latency per foto                     : 323 ms
+Min / Max Latency                            : 226 / 466 ms
+
+Per-Karyawan:
+  id= 17 | Enrico Kevin Ariantho          | detect=3/3, correct=3/3, real=3/3
+
+==============================================================================================================
+KETERANGAN FIELD:
+  - 'Wajah'      : jumlah wajah ter-detect (FaceDetector YOLO26)
+  - 'Confidence' : cosine similarity ArcFace dengan template terbaik (threshold 0.4)
+  - 'ID Benar?'  : YA jika id_karyawan match dengan foto yang diuji
+  - 'Anti-Spoof' : REAL/SPOOF + confidence (ensemble MiniFASNet V2 + V1SE)
+  - 'Latency'    : total processing time per foto (detect + embed + identify + antispoof)
+==============================================================================================================

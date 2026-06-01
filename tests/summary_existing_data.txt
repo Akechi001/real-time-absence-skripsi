@@ -1,0 +1,31 @@
+======================================================================
+RINGKASAN DATA OPERASIONAL — Sistem Absensi Wajah
+STIE Ciputra Makassar — Skripsi Enrico Kevin Ariantho (0806022210012)
+Diekstrak pada: 2026-05-28 16:29:52
+======================================================================
+
+LOG ABSENSI (raw lewatan dari kamera)
+----------------------------------------------------------------------
+Total entri log_absensi            : 511
+Jumlah karyawan unik terdeteksi    : 6
+Average confidence score           : 0.6146
+Confidence score range             : 0.4027 – 0.8785
+Liveness pass count                : 511 / 511
+Liveness pass rate                 : 100.00%
+
+ABSENSI HARIAN (hasil resolver tengah malam)
+----------------------------------------------------------------------
+Jumlah hari ter-resolve            : 11
+Total entri absensi_harian         : 20
+Rentang tanggal di absensi_harian  : 2026-04-06 – 2026-05-27
+Terlambat                          : 9
+Pulang cepat                       : 7
+Data tidak lengkap                 : 7
+
+FILE OUTPUT
+----------------------------------------------------------------------
+  - data_lewatan_existing.csv      (511 rows)
+  - statistik_per_karyawan.csv     (6 rows)
+  - hasil_resolver_existing.csv    (20 rows)
+
+======================================================================

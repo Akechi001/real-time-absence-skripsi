@@ -1,0 +1,25 @@
+2026-05-29 00:14:14 [INFO] [Iter 4] Subprocess exit code 2 setelah 908.2s
+2026-05-29 00:14:14 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 00:14:17 [INFO] [Iter 5] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 00:29:28 [INFO] [Iter 5] Subprocess exit code 2 setelah 910.9s
+2026-05-29 00:29:28 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 00:29:31 [INFO] [Iter 6] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 00:44:39 [INFO] [Iter 6] Subprocess exit code 2 setelah 908.6s
+2026-05-29 00:44:39 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 00:44:42 [INFO] [Iter 7] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 00:59:50 [INFO] [Iter 7] Subprocess exit code 2 setelah 908.0s
+2026-05-29 00:59:50 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 00:59:53 [INFO] [Iter 8] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 01:15:00 [INFO] [Iter 8] Subprocess exit code 2 setelah 906.2s
+2026-05-29 01:15:00 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 01:15:03 [INFO] [Iter 9] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 01:30:09 [INFO] [Iter 9] Subprocess exit code 2 setelah 906.7s
+2026-05-29 01:30:09 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 01:30:12 [INFO] [Iter 10] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 01:45:18 [INFO] [Iter 10] Subprocess exit code 2 setelah 906.1s
+2026-05-29 01:45:18 [INFO] Exit code 2 (pre-emptive restart untuk mitigasi memory). Spawn proses baru dalam 3s...
+2026-05-29 01:45:21 [INFO] [Iter 11] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-05-29 01:54:56 [INFO] [Iter 11] Subprocess exit code 0 setelah 574.8s
+2026-05-29 01:54:56 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-05-29 01:54:56 [INFO] Daemon selesai (total iterasi: 11)
+2026-05-29 01:54:56 [INFO] ============================================================

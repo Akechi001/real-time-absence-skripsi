@@ -1,0 +1,21 @@
+Nama_Karyawan,Tanggal,Check_In,Check_Out,Terlambat,Pulang_Cepat,Keterangan,Waktu_Resolve
+Enrico Kevin Ariantho,2026-05-27,2026-05-27 11:05:16.444266,2026-05-27 23:59:32.166518,True,False,terlambat,2026-05-28 00:00:00.430256
+Testing,2026-05-26,2026-05-26 10:44:37.043305,2026-05-26 10:45:44.165894,True,True,"terlambat, pulang cepat",2026-05-27 00:00:03.401757
+Testing,2026-05-25,2026-05-25 10:54:48.243511,2026-05-25 11:50:02.083121,True,True,"terlambat, pulang cepat",2026-05-26 00:04:53.683092
+Testing,2026-05-22,,,,,data tidak lengkap (cuma 1 lewatan jam 11:01),2026-05-23 00:05:02.044227
+Enrico Kevin Ariantho,2026-05-15,2026-05-15 04:07:10.888989,2026-05-15 21:56:20.435115,False,False,normal,2026-05-16 00:05:04.561948
+richard,2026-05-15,2026-05-15 16:13:49.633811,2026-05-15 16:44:37.149650,True,True,"terlambat, pulang cepat",2026-05-16 00:05:04.561948
+Enrico Kevin Ariantho,2026-05-14,2026-05-14 22:13:28.672754,2026-05-14 22:38:58.410998,True,False,terlambat,2026-05-15 04:45:44.395770
+richard,2026-05-14,,,,,data tidak lengkap (cuma 1 lewatan jam 23:44),2026-05-15 04:45:44.395770
+Pak Juan,2026-04-30,2026-04-30 15:24:34.915013,2026-04-30 15:29:07.707009,True,True,"terlambat, pulang cepat",2026-05-26 03:32:07.255943
+ajdnejadnjadja,2026-04-27,2026-04-27 01:10:20.919668,2026-04-27 01:30:01.634474,False,True,pulang cepat,2026-05-13 01:03:08.195930
+Enrico Kevin Ariantho,2026-04-27,2026-04-27 00:59:52.373120,2026-04-27 03:31:14.006455,False,True,pulang cepat,2026-05-13 01:03:08.195930
+ajdnejadnjadja,2026-04-26,2026-04-26 16:47:46.463021,2026-04-26 21:31:57.618983,True,False,terlambat,2026-05-13 01:03:08.188007
+Enrico Kevin Ariantho,2026-04-26,2026-04-26 16:47:09.141777,2026-04-26 21:31:55.430126,True,False,terlambat,2026-05-13 01:03:08.188007
+richard,2026-04-26,,,,,data tidak lengkap (cuma 1 lewatan jam 21:31),2026-05-13 01:03:08.188007
+Enrico Kevin Ariantho,2026-04-07,2026-04-07 14:07:19.737330,2026-04-07 17:02:34.431938,True,False,terlambat,2026-05-13 01:03:08.176628
+Hendra Okta,2026-04-07,,,,,data tidak lengkap (cuma 1 lewatan jam 17:02),2026-05-13 01:03:08.176628
+Dewa anugerah,2026-04-06,,,,,data tidak lengkap (cuma 1 lewatan jam 16:47),2026-05-13 01:03:08.145663
+Enrico Kevin Ariantho,2026-04-06,2026-04-06 01:58:43.369470,2026-04-06 16:47:20.509420,False,True,pulang cepat,2026-05-13 01:03:08.145663
+Hendra Okta,2026-04-06,,,,,data tidak lengkap (cuma 1 lewatan jam 16:47),2026-05-13 01:03:08.145663
+Johan Reinaldo,2026-04-06,,,,,data tidak lengkap (cuma 1 lewatan jam 16:47),2026-05-13 01:03:08.145663

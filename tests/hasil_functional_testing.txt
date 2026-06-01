@@ -1,0 +1,34 @@
+========================================================================
+FUNCTIONAL TESTING — Sistem Absensi Wajah
+STIE Ciputra Makassar — Skripsi Enrico Kevin Ariantho (0806022210012)
+Dijalankan: 2026-05-28 16:23:22
+========================================================================
+
+Pre-test cleanup: done
+
+[PASS] TC-01: Enroll karyawan baru valid
+        → id_karyawan=18, nip=TEST_REL_001, status_aktif=True
+[PASS] TC-02: Enroll dengan NIP duplikat ditolak
+        → insert#1 id=19, insert#2 rejected (returned None)
+[PASS] TC-03: NIP dengan huruf/simbol ditolak (UI validation)
+        → invalid ['ABC123', '12.34', '12-345', 'abc'] → rejected; valid ['123456', '0001', '1'] → accepted
+[PASS] TC-04: Resolver agregat MIN(timestamp)=check_in, MAX=check_out
+        → check_in=07:45:00 (MIN), check_out=17:05:00 (MAX), terlambat=True, pulang_cepat=False, keterangan='terlambat'
+[PASS] TC-05: Resolver 1 lewatan → 'data tidak lengkap'
+        → check_in=NULL, check_out=NULL, keterangan='data tidak lengkap (cuma 1 lewatan jam 09:00)'
+[PASS] TC-06: Resolver idempotent (ON CONFLICT DO NOTHING)
+        → second call inserted_count=0, total rows TEST_REL_ untuk 2099-01-15 tetap 2
+[PASS] TC-07: Cooldown 60s aktif setelah passage
+        → is_cooldown=True dalam window 60s
+[PASS] TC-08: Soft delete karyawan
+        → row exists, status_aktif=FALSE, template dihapus (count=0)
+[PASS] TC-09: get_log_absensi() schema sesuai
+        → required keys present: ['confidence_score', 'id_karyawan', 'id_log', 'jenis_event', 'status_liveness', 'timestamp'], actual keys: ['confidence_score', 'id_karyawan', 'id_log', 'jabatan', 'jenis_event', 'keterangan', 'nama', 'nip', 'status_liveness', 'timestamp']
+[PASS] TC-10: get_absensi_harian_stats() return numeric dict
+        → keys=['pulang_cepat', 'terlambat', 'tidak_lengkap', 'total'], values={'total': 22, 'terlambat': 10, 'pulang_cepat': 7, 'tidak_lengkap': 8}
+
+Post-test cleanup: done
+
+========================================================================
+RINGKASAN: 10 PASS, 0 FAIL (total 10 test cases)
+========================================================================
