@@ -1,6 +1,7 @@
 # src/attendance.py - Sistem absensi otomatis dengan anti-spoofing
 
 import cv2
+import gc
 import time
 import threading
 import sys
@@ -15,7 +16,7 @@ from src.modules.face_recognizer import FaceRecognizer
 from src.modules.liveness import LivenessDetector
 from src.modules.anti_spoofing.detector import AntiSpoofingDetector
 from src.database.operations import (
-    get_all_templates, save_log_absensi, get_last_event
+    get_all_templates, save_log_absensi
 )
 from src.payload import build_payload, send_payload
 import config
@@ -47,12 +48,6 @@ class AttendanceSystem:
         if id_karyawan not in self.cooldown:
             return False
         return time.time() - self.cooldown[id_karyawan] < config.COOLDOWN_SECONDS
-
-    def determine_event(self, id_karyawan):
-        last = get_last_event(id_karyawan)
-        if last is None:
-            return "check-in"
-        return "check-out" if last['jenis_event'] == "check-in" else "check-in"
 
     def process_frame(self, frame, faces):
         """
@@ -148,24 +143,24 @@ class AttendanceSystem:
                 })
                 continue
 
-            # 6. Tentukan jenis event
-            jenis_event = self.determine_event(id_karyawan)
-
-            # 7. Simpan log absensi
+            # 6. Simpan log absensi sebagai 'passage' (raw lewatan).
+            #    Keputusan check-in/check-out + status terlambat/pulang cepat
+            #    dilakukan batch tengah malam oleh resolve_attendance_for_date().
             save_log_absensi(
                 id_karyawan=id_karyawan,
-                jenis_event=jenis_event,
+                jenis_event='passage',
                 confidence_score=confidence,
                 status_liveness=is_live
             )
 
-            # 8. Kirim payload
+            # 7. Kirim payload
+            passage_time = time.strftime('%H:%M:%S')
             payload = build_payload(
-                id_karyawan, nama, jenis_event, confidence, is_live
+                id_karyawan, nama, 'passage', confidence, is_live
             )
             send_payload(payload)
 
-            # 9. Set cooldown dan reset liveness
+            # 8. Set cooldown dan reset liveness
             self.cooldown[id_karyawan] = time.time()
             self.liveness.reset_state(i)
 
@@ -177,18 +172,34 @@ class AttendanceSystem:
                 'id_karyawan': id_karyawan,
                 'nama': nama,
                 'confidence': confidence,
-                'jenis_event': jenis_event,
+                'passage_time': passage_time,
             })
 
+        # Lepas list Face object InsightFace — tiap Face simpan embedding +
+        # landmark 2D/3D + bbox + kps (~15-20KB). Tanpa ini ref bisa tertahan
+        # via closure di anti_spoofing/liveness sampai GC siklus berikutnya.
+        del faces_insightface
         return results
 
-    def run(self, enrollment_thread, stop_event, enrollment_event):
+    def run(self, stop_event):
+        """Returns True kalau pre-emptive restart (uptime lewat batas),
+        False kalau intentional stop (Q key).
+        """
         print(f"\n=== SISTEM ABSENSI BERJALAN ===")
         print("Tekan Q di jendela kamera untuk keluar\n")
 
         cap = cv2.VideoCapture(config.CAMERA_INDEX)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
+        # Set internal buffer ke 1 frame supaya gak akumulasi queue
+        try:
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
+        start_time = time.time()
+        max_uptime = getattr(config, 'MAX_UPTIME_SECONDS', 0)
+        preemptive_restart = False
 
         display_state = {
             'last_faces': [],
@@ -198,14 +209,15 @@ class AttendanceSystem:
         }
         display_lock = threading.Lock()
 
-        bg_state = {
-            'frame': None,
-            'ready': True,
-        }
+        bg_state = {'frame': None, 'ready': True}
         bg_lock = threading.Lock()
         bg_trigger = threading.Event()
 
+        last_gc_time = time.time()
+        GC_INTERVAL = 60  # 1 menit
+
         def background_worker():
+            nonlocal last_gc_time
             while not stop_event.is_set():
                 bg_trigger.wait(timeout=0.5)
                 bg_trigger.clear()
@@ -235,6 +247,13 @@ class AttendanceSystem:
                 with bg_lock:
                     bg_state['ready'] = True
 
+                # gc.collect() tiap 1 menit — Python GC lazy, paksa
+                # reclaim Python ref cycles secara periodic.
+                if time.time() - last_gc_time > GC_INTERVAL:
+                    collected = gc.collect()
+                    last_gc_time = time.time()
+                    print(f"🧹 gc.collect() → {collected} objects released")
+
         worker = threading.Thread(target=background_worker, daemon=True)
         worker.start()
 
@@ -242,20 +261,35 @@ class AttendanceSystem:
         last_send_time = 0
 
         while not stop_event.is_set():
-
-            if enrollment_event.is_set() and enrollment_thread.pending_enrollment:
-                enrollment_event.clear()
-                cap.release()
-                cv2.destroyAllWindows()
-                enrollment_thread.do_enrollment(self)
-                cap = cv2.VideoCapture(config.CAMERA_INDEX)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.FRAME_WIDTH)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.FRAME_HEIGHT)
-                continue
+            # Pre-emptive restart untuk mitigasi memory leak ONNX/PyTorch
+            # arena pool yang tidak shrink di CPU backend.
+            if max_uptime > 0 and time.time() - start_time > max_uptime:
+                print(f"\n♻️  Pre-emptive restart: uptime > {max_uptime}s, "
+                      f"daemon akan spawn proses baru.\n")
+                preemptive_restart = True
+                stop_event.set()
+                break
 
             ret, frame = cap.read()
             if not ret:
-                break
+                # Camera read failed — bisa karena buffer hiccup atau
+                # disconnect sementara. Retry beberapa kali dulu sebelum
+                # give up. Kalau tetap gagal, treat sebagai restart-worthy
+                # (bukan intentional stop) supaya daemon spawn proses baru
+                # dengan kamera fresh.
+                read_failed = True
+                for retry in range(10):
+                    time.sleep(0.1)
+                    ret, frame = cap.read()
+                    if ret:
+                        read_failed = False
+                        print(f"📷 Camera recovered setelah {retry+1} retry")
+                        break
+                if read_failed:
+                    print("⚠ Camera read failed setelah 10x retry — request restart")
+                    preemptive_restart = True
+                    stop_event.set()
+                    break
 
             current_time = time.time()
 
@@ -285,7 +319,7 @@ class AttendanceSystem:
             if last_results and time.time() - last_result_time < 3:
                 for r in last_results:
                     if r['status'] == 'success':
-                        text = f"{r['jenis_event'].upper()}: {r['nama']} ({r['confidence']:.2f})"
+                        text = f"Terdeteksi: {r['nama']} ({r['passage_time']})"
                         cv2.putText(display_frame, text, (10, y_offset),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                         y_offset += 30
@@ -322,3 +356,4 @@ class AttendanceSystem:
 
         cap.release()
         cv2.destroyAllWindows()
+        return preemptive_restart

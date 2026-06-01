@@ -1,272 +1,361 @@
-# src/ui/main_window.py - Main Window Dashboard
+# src/ui/main_window.py - Dashboard SaaS dengan CustomTkinter (rounded modern)
 
-import tkinter as tk
-from tkinter import ttk, messagebox
-import sys
 import os
+import sys
+import subprocess
+
+import customtkinter as ctk
+from tkinter import messagebox
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from src.ui.theme import get_colors, get_button_colors, hover_color
+
+# ---- Global ctk config ----
+ctk.set_appearance_mode("system")        # follow macOS light/dark
+ctk.set_default_color_theme("blue")      # accent
 
 
-class MainWindow:
+SIDEBAR_WIDTH = 240
+WINDOW_W, WINDOW_H = 1280, 760
+
+# Interval auto-refresh page aktif (ms).
+# 30 detik dipilih untuk reduce churn — auto-refresh tiap 5 detik bikin
+# DB query + Treeview redraw yang gak perlu kalau user gak aktif melihat.
+AUTO_REFRESH_INTERVAL_MS = 30000
+
+
+# Warna sidebar — selalu navy gelap tanpa peduli mode
+SIDEBAR_BG       = "#1f2937"
+SIDEBAR_HOVER    = "#374151"
+SIDEBAR_ACTIVE   = "#3b82f6"
+SIDEBAR_TEXT     = "#9ca3af"
+SIDEBAR_TEXT_ACT = "#ffffff"
+SIDEBAR_MUTED    = "#6b7280"
+SIDEBAR_LOGO_FG  = "#ffffff"
+
+NAV_ITEMS = [
+    ('home',     '📊', 'Dashboard'),
+    ('karyawan', '👥', 'Karyawan'),
+    ('log',      '📋', 'Log Absensi'),
+]
+
+
+class DashboardApp:
     def __init__(self, root):
         self.root = root
-        self.colors = get_colors()
-
-        self.root.title("Sistem Absensi Wajah - Universitas Ciputra Makassar")
-        self.root.geometry("650x600")
-        self.root.resizable(False, False)
-        self.root.configure(bg=self.colors['bg_primary'])
-
+        self.root.title("Sistem Absensi Wajah — STIE Ciputra Makassar")
+        self.root.geometry(f"{WINDOW_W}x{WINDOW_H}")
+        self.root.minsize(1100, 660)
         self._center_window()
 
-        self.root.lift()
-        self.root.attributes('-topmost', True)
-        self.root.after_idle(self.root.attributes, '-topmost', False)
+        # Grid: sidebar | content
+        self.root.grid_columnconfigure(1, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
 
-        self._create_widgets()
+        self.pages = {}
+        self.current_name = None
+        self.nav_buttons = {}
+        self._auto_refresh_job = None
+        self._auto_refresh_paused = False  # paused saat subprocess attendance jalan
+
+        # Remember pilihan kamera terakhir antar Mulai Absensi (in-memory)
+        self._last_camera_index = None
+
+        self._build_sidebar()
+        self._build_content_area()
+        self.show_page('home')
+        self._tick_auto_refresh()
 
     def _center_window(self):
         self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
-        self.root.geometry(f'{width}x{height}+{x}+{y}')
+        x = (self.root.winfo_screenwidth() // 2) - (WINDOW_W // 2)
+        y = (self.root.winfo_screenheight() // 2) - (WINDOW_H // 2)
+        self.root.geometry(f'{WINDOW_W}x{WINDOW_H}+{x}+{y}')
 
-    def _create_widgets(self):
-        main_frame = tk.Frame(
+    # ============================================================
+    # SIDEBAR
+    # ============================================================
+
+    def _build_sidebar(self):
+        sidebar = ctk.CTkFrame(
             self.root,
-            bg=self.colors['bg_primary'],
-            padx=40,
-            pady=30
+            width=SIDEBAR_WIDTH,
+            corner_radius=0,
+            fg_color=SIDEBAR_BG,
         )
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        sidebar.grid(row=0, column=0, sticky="nsew")
+        sidebar.grid_propagate(False)
+        sidebar.grid_columnconfigure(0, weight=1)  # nav button isi full lebar
+        sidebar.grid_rowconfigure(99, weight=1)    # footer dorong ke bawah
 
-        # ========== HEADER ==========
-        header_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        header_frame.pack(fill=tk.X, pady=(0, 20))
+        # ----- Logo -----
+        logo_box = ctk.CTkFrame(sidebar, fg_color="transparent")
+        logo_box.grid(row=0, column=0, sticky="ew", padx=24, pady=(30, 28))
 
-        header_label = tk.Label(
-            header_frame,
-            text="SISTEM ABSENSI WAJAH",
-            font=("Helvetica", 22, "bold"),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_primary']
+        ctk.CTkLabel(
+            logo_box, text="🎓",
+            font=ctk.CTkFont(size=32),
+            text_color=SIDEBAR_LOGO_FG,
+        ).pack(anchor='w')
+
+        ctk.CTkLabel(
+            logo_box, text="Absensi Wajah",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color=SIDEBAR_LOGO_FG,
+        ).pack(anchor='w', pady=(10, 0))
+
+        ctk.CTkLabel(
+            logo_box, text="STIE Ciputra Makassar",
+            font=ctk.CTkFont(size=10),
+            text_color=SIDEBAR_MUTED,
+        ).pack(anchor='w')
+
+        # ----- Section: MENU -----
+        ctk.CTkLabel(
+            sidebar, text="MENU",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=SIDEBAR_MUTED,
+            anchor='w',
+        ).grid(row=1, column=0, sticky="ew", padx=28, pady=(0, 6))
+
+        # ----- Nav buttons -----
+        for idx, (name, icon, label) in enumerate(NAV_ITEMS):
+            btn = ctk.CTkButton(
+                sidebar,
+                text=f"  {icon}    {label}",
+                anchor="w",
+                fg_color="transparent",
+                text_color=SIDEBAR_TEXT,
+                hover_color=SIDEBAR_HOVER,
+                corner_radius=10,
+                height=44,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                command=lambda n=name: self.show_page(n),
+            )
+            btn.grid(row=2 + idx, column=0, sticky="ew", padx=14, pady=3)
+            self.nav_buttons[name] = btn
+
+        # ----- Footer -----
+        footer = ctk.CTkFrame(sidebar, fg_color="transparent")
+        footer.grid(row=100, column=0, sticky="sew", padx=24, pady=20)
+
+        ctk.CTkLabel(
+            footer, text="© 2026 Enrico K. A.",
+            font=ctk.CTkFont(size=9),
+            text_color=SIDEBAR_MUTED,
+        ).pack(anchor='w')
+
+        ctk.CTkLabel(
+            footer, text="Skripsi v1.0",
+            font=ctk.CTkFont(size=9),
+            text_color=SIDEBAR_MUTED,
+        ).pack(anchor='w')
+
+    def _build_content_area(self):
+        self.content_area = ctk.CTkFrame(self.root, corner_radius=0)
+        self.content_area.grid(row=0, column=1, sticky="nsew")
+
+    # ============================================================
+    # PAGE ROUTING
+    # ============================================================
+
+    def show_page(self, name):
+        if self.current_name and self.current_name in self.pages:
+            self.pages[self.current_name].pack_forget()
+
+        if name not in self.pages:
+            self.pages[name] = self._create_page(name)
+
+        self.pages[name].pack(fill="both", expand=True)
+        self.current_name = name
+        self._update_active_nav()
+
+        page = self.pages[name]
+        if hasattr(page, 'on_show'):
+            page.on_show()
+
+    def _create_page(self, name):
+        if name == 'home':
+            from src.ui.home_page import HomePage
+            return HomePage(self.content_area, app=self)
+        if name == 'karyawan':
+            from src.ui.karyawan_list import KaryawanListFrame
+            return KaryawanListFrame(self.content_area, app=self)
+        if name == 'log':
+            from src.ui.log_absensi import LogAbsensiFrame
+            return LogAbsensiFrame(self.content_area, app=self)
+        raise ValueError(f"Unknown page: {name}")
+
+    def _tick_auto_refresh(self):
+        """Refresh page aktif tiap AUTO_REFRESH_INTERVAL_MS, self-rescheduling.
+
+        Berhenti re-schedule kalau flag _auto_refresh_paused True (mis. saat
+        subprocess attendance jalan, mencegah Tkinter redraw issue di macOS
+        ketika window iconified).
+        """
+        if self._auto_refresh_paused:
+            self._auto_refresh_job = None
+            return
+
+        page = self.pages.get(self.current_name)
+        if page is not None and hasattr(page, 'refresh'):
+            try:
+                page.refresh()
+            except Exception as e:
+                # Jangan biarkan exception putus loop scheduling
+                print(f"[auto-refresh] {self.current_name}: {e}")
+
+        self._auto_refresh_job = self.root.after(
+            AUTO_REFRESH_INTERVAL_MS, self._tick_auto_refresh
         )
-        header_label.pack()
 
-        subtitle_label = tk.Label(
-            header_frame,
-            text="Universitas Ciputra Surabaya - Kampus Makassar",
-            font=("Helvetica", 11),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_primary']
-        )
-        subtitle_label.pack(pady=(5, 0))
+    def _pause_auto_refresh(self):
+        self._auto_refresh_paused = True
+        if self._auto_refresh_job is not None:
+            try:
+                self.root.after_cancel(self._auto_refresh_job)
+            except Exception:
+                pass
+            self._auto_refresh_job = None
 
-        # ========== SEPARATOR ==========
-        separator = tk.Frame(
-            main_frame,
-            bg=self.colors['border'],
-            height=2
-        )
-        separator.pack(fill='x', pady=(0, 25))
+    def _resume_auto_refresh(self):
+        if not self._auto_refresh_paused:
+            return
+        self._auto_refresh_paused = False
+        # Mulai chain baru
+        self._tick_auto_refresh()
 
-        # ========== BUTTONS ==========
-        button_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        button_frame.pack(fill=tk.BOTH, expand=True)
+    def _update_active_nav(self):
+        for n, btn in self.nav_buttons.items():
+            if n == self.current_name:
+                btn.configure(fg_color=SIDEBAR_ACTIVE, text_color=SIDEBAR_TEXT_ACT)
+            else:
+                btn.configure(fg_color="transparent", text_color=SIDEBAR_TEXT)
 
-        self._create_button(
-            button_frame,
-            text="➕  Tambah Karyawan Baru",
-            button_type='green',
-            command=self._on_add_karyawan
-        )
+    # ============================================================
+    # APP-LEVEL ACTIONS (DAEMON)
+    # ============================================================
 
-        self._create_button(
-            button_frame,
-            text="📋  Daftar Karyawan",
-            button_type='blue',
-            command=self._on_list_karyawan
-        )
+    def start_daemon(self):
+        """Spawn attendance_daemon.py sebagai detached subprocess.
 
-        self._create_button(
-            button_frame,
-            text="🎥  Mulai Mode Absensi",
-            button_type='orange',
-            command=self._on_start_attendance
-        )
+        Daemon punya logic auto-restart sendiri. UI gak track PID-nya —
+        daemon mengelola lifecycle sendiri, stop via STOP file (lihat
+        scripts/attendance_daemon.py).
+        """
+        # GUARD: cegah double-start. Tiap instance daemon ~500MB (InsightFace
+        # + YOLO + MiniFASNet di-load fresh per process), jadi double-start
+        # bisa langsung lonjak RAM ~1GB plus konflik cv2.VideoCapture.
+        if self._is_daemon_running():
+            messagebox.showwarning(
+                "Mode Absensi Sudah Jalan",
+                "Daemon attendance sudah berjalan di background.\n\n"
+                "Untuk berhenti dulu, klik tombol \"Stop Absensi\"."
+            )
+            return
 
-        self._create_button(
-            button_frame,
-            text="📊  Lihat Log Absensi",
-            button_type='purple',
-            command=self._on_view_logs
-        )
+        from src.ui.camera_picker import CameraPickerDialog
+        import config
 
-        # ========== FOOTER ==========
-        footer_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        footer_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(20, 0))
+        default_idx = self._last_camera_index
+        if default_idx is None:
+            default_idx = getattr(config, 'CAMERA_INDEX', 0)
 
-        footer_label = tk.Label(
-            footer_frame,
-            text="© 2026 - Skripsi Enrico Kevin Ariantho",
-            font=("Helvetica", 9),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_primary']
-        )
-        footer_label.pack()
+        chosen_idx = CameraPickerDialog.ask(self.root, default_index=default_idx)
+        if chosen_idx is None:
+            return
 
-    def _create_button(self, parent, text, button_type, command):
-        btn_colors = get_button_colors(button_type)
-        bg_color = btn_colors['bg']
-        fg_color = btn_colors['fg']
+        self._last_camera_index = chosen_idx
 
-        # macOS workaround: tk.Button bg di-ignore, pakai Frame sebagai container
-        btn_container = tk.Frame(
-            parent,
-            bg=bg_color,
-            highlightthickness=0,
-            bd=0
-        )
-        btn_container.pack(fill=tk.X, pady=8)
-
-        btn = tk.Label(
-            btn_container,
-            text=text,
-            font=("Helvetica", 13, "bold"),
-            bg=bg_color,
-            fg=fg_color,
-            cursor='hand2',
-            padx=20,
-            pady=18
-        )
-        btn.pack(fill=tk.BOTH, expand=True)
-
-        # Bind click event
-        def on_click(e):
-            command()
-
-        def on_enter(e):
-            new_color = hover_color(bg_color)
-            btn_container.config(bg=new_color)
-            btn.config(bg=new_color)
-
-        def on_leave(e):
-            btn_container.config(bg=bg_color)
-            btn.config(bg=bg_color)
-
-        btn.bind("<Button-1>", on_click)
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        btn_container.bind("<Button-1>", on_click)
-        btn_container.bind("<Enter>", on_enter)
-        btn_container.bind("<Leave>", on_leave)
-
-        return btn_container
-
-    # ========== Event Handlers ==========
-
-    def _on_add_karyawan(self):
-        """Buka window enrollment"""
-        from src.ui.enrollment_window import open_enrollment_window
-        open_enrollment_window(self.root)
-
-    def _on_list_karyawan(self):
-        from src.ui.karyawan_list import open_karyawan_list
-        open_karyawan_list(self.root)
-
-    def _on_start_attendance(self):
-        """Mulai mode attendance dengan subprocess (di thread terpisah)"""
-        import subprocess
-        import sys
-        import threading
-
-        # Konfirmasi
         confirm = messagebox.askyesno(
-            "Mulai Mode Absensi",
-            "Sistem akan menjalankan mode absensi.\n\n"
+            "Mulai Absensi",
+            "Mode absensi akan jalan di background (24 jam).\n\n"
             "📌 Cara kerja:\n"
-            "  • Window UI akan di-minimize\n"
-            "  • Kamera akan terbuka untuk attendance\n"
-            "  • Tekan Q (atau tutup window kamera) untuk berhenti\n"
-            "  • UI akan muncul lagi setelah mode absensi ditutup\n\n"
+            "  • Kamera terbuka, log absensi terus aktif\n"
+            "  • Auto-restart kalau crash\n"
+            "  • Log file: logs/attendance.log\n"
+            "  • Untuk berhenti: klik tombol \"Stop Absensi\"\n\n"
             "Lanjutkan?"
         )
-
         if not confirm:
             return
 
-        # Path ke main.py
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        main_script = os.path.join(project_root, 'main.py')
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)
+        )))
+        daemon_script = os.path.join(project_root, 'scripts', 'attendance_daemon.py')
 
-        if not os.path.exists(main_script):
+        if not os.path.exists(daemon_script):
             messagebox.showerror(
-                "Error",
-                f"File main.py tidak ditemukan di:\n{main_script}"
+                "Error", f"Script daemon tidak ditemukan:\n{daemon_script}"
             )
             return
 
-        # Minimize UI window
-        self.root.iconify()
+        env = os.environ.copy()
+        env['CAMERA_INDEX_OVERRIDE'] = str(chosen_idx)
 
-        # Run subprocess di thread terpisah supaya UI tidak freeze
-        def run_attendance():
-            try:
-                result = subprocess.run(
-                    [sys.executable, main_script],
-                    cwd=project_root
-                )
-                return_code = result.returncode
-            except Exception as e:
-                return_code = -1
-                print(f"Error running attendance: {e}")
-
-            # Kembali ke main thread untuk update UI
-            self.root.after(0, lambda: self._on_attendance_finished(return_code))
-
-        # Jalankan thread
-        thread = threading.Thread(target=run_attendance, daemon=True)
-        thread.start()
-
-
-    def _on_attendance_finished(self, return_code):
-        """Callback saat attendance selesai - dipanggil di main thread"""
-        # Restore UI window
-        self.root.deiconify()
-        self.root.lift()
-        self.root.focus_force()
-
-        if return_code == 0:
+        try:
+            # Detached subprocess — fully independent dari UI process
+            subprocess.Popen(
+                [sys.executable, daemon_script],
+                cwd=project_root, env=env,
+                start_new_session=True,   # detach dari proses UI
+            )
             messagebox.showinfo(
-                "Mode Absensi Selesai",
-                "Mode absensi telah ditutup."
+                "Absensi Dimulai",
+                "Mode absensi jalan di background.\n\n"
+                "Kamera index: " + str(chosen_idx) + "\n"
+                "Log file: logs/attendance.log\n\n"
+                "Untuk berhenti: klik \"Stop Absensi\"."
             )
-        elif return_code == -1:
+        except Exception as e:
             messagebox.showerror(
-                "Error",
-                "Gagal menjalankan mode absensi.\nCek terminal untuk detail error."
-            )
-        else:
-            messagebox.showwarning(
-                "Mode Absensi Selesai",
-                f"Mode absensi ditutup dengan kode: {return_code}\n"
-                f"Cek terminal untuk detail error (jika ada)."
+                "Gagal Start Daemon", f"Error: {e}"
             )
 
-    def _on_view_logs(self):
-        """Buka window log absensi"""
-        from src.ui.log_absensi import open_log_absensi
-        open_log_absensi(self.root)
+    def stop_daemon(self):
+        """Stop daemon dengan bikin file STOP."""
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)
+        )))
+        stop_file = os.path.join(project_root, 'logs', 'STOP')
+
+        if not self._is_daemon_running():
+            messagebox.showinfo(
+                "Absensi Tidak Aktif",
+                "Tidak ada mode absensi yang sedang jalan."
+            )
+            return
+
+        try:
+            os.makedirs(os.path.dirname(stop_file), exist_ok=True)
+            open(stop_file, 'w').close()
+            messagebox.showinfo(
+                "Stop Sinyal Dikirim",
+                "Daemon akan stop di iterasi berikutnya.\n"
+                "Kalau attendance sedang jalan, tekan Q di window kamera dulu."
+            )
+        except Exception as e:
+            messagebox.showerror("Gagal Kirim Stop", f"Error: {e}")
+
+    def _is_daemon_running(self):
+        """Cek apakah daemon jalan via pgrep nama script-nya."""
+        try:
+            out = subprocess.check_output(
+                ['pgrep', '-f', 'attendance_daemon.py'],
+                stderr=subprocess.DEVNULL,
+            )
+            pids = [int(x) for x in out.decode().strip().split('\n') if x.strip()]
+            return len(pids) > 0
+        except subprocess.CalledProcessError:
+            return False
+        except Exception:
+            return False
 
 
 def main():
-    root = tk.Tk()
-    app = MainWindow(root)
+    root = ctk.CTk()
+    DashboardApp(root)
     root.mainloop()
 
 

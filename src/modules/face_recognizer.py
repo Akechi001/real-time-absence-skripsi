@@ -1,10 +1,16 @@
 # src/modules/face_recognizer.py - Face recognition menggunakan InsightFace ArcFace
 
 import numpy as np
-import insightface
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+# CRITICAL: apply ONNX patch SEBELUM import insightface, supaya semua
+# InferenceSession yang dibuat insightface langsung pakai SessionOptions
+# tanpa CPU arena pool (mitigasi memory leak).
+from src.utils import onnx_patch  # noqa: F401
+
+import insightface
 import config
 
 

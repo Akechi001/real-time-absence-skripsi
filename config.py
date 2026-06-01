@@ -29,11 +29,8 @@ EAR_CONSEC_FRAMES = 1
 HEAD_MOVE_THRESHOLD = 15
 LIVENESS_WINDOW = 8
 
-# Kamera
-CAMERA_INDEX = 0  # Kamera utama untuk attendance (di pintu masuk)
-ENROLLMENT_CAMERA_INDEX = None  # Kamera enrollment (di ruang ICT)
-                                # None = pakai CAMERA_INDEX yang sama (Skenario A: 1 kamera)
-                                # 1 = pakai webcam external (Skenario B: 2 kamera)
+# Kamera (cuma 1 — buat attendance saja, enrollment via upload foto)
+CAMERA_INDEX = 0
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
@@ -47,3 +44,23 @@ PHOTOS_DIR = "data/photos"
 
 # Anti-spoofing CNN
 ANTI_SPOOFING_THRESHOLD = 0.5
+
+# Resolve absensi harian (jam tengah malam)
+WORK_START_TIME = "07:30"        # check-in lewat dari jam ini = terlambat
+WORK_END_TIME = "16:30"          # check-out sebelum jam ini = pulang cepat
+RESOLVE_ONLY_INTERNAL = True     # vendor di-skip dari absensi_harian (multi-shift)
+
+# Pre-emptive restart untuk mitigasi memory leak.
+#
+# Sumber leak: kombinasi ONNX Runtime + PyTorch + OpenCV internal
+# buffers/allocators di CPU backend yang tidak shrink. Sudah dicoba
+# fix via onnx_patch.py (disable arena pool), torch.set_num_threads(1),
+# dan gc.collect() periodic — TIDAK CUKUP. Swap tetap naik ~1.5 GB/menit
+# di MacBook Air.
+#
+# Pragmatic mitigation: restart subprocess attendance tiap 15 menit
+# supaya swap tidak menggunung sampai system thrashing.
+#
+# Downtime per restart: ~10 detik (load YOLO + InsightFace + MiniFASNet).
+# Total downtime/hari: 96 × 10s = 16 menit (~1.1% uptime).
+MAX_UPTIME_SECONDS = 900         # 15 menit (set 0 untuk disable)

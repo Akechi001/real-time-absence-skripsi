@@ -5,7 +5,13 @@ from datetime import datetime
 
 
 def build_payload(id_karyawan, nama, jenis_event, confidence, status_liveness):
-    """Bangun payload JSON untuk simulasi integrasi backend"""
+    """
+    Bangun payload JSON untuk simulasi integrasi backend.
+
+    jenis_event = 'passage' (lewatan mentah).
+    Keputusan check-in / check-out / terlambat / pulang cepat dilakukan
+    batch tengah malam berdasarkan MIN/MAX timestamp per tanggal.
+    """
     return {
         "id_karyawan": id_karyawan,
         "nama": nama,

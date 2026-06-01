@@ -91,8 +91,10 @@ class LivenessDetector:
                     state['blink_count'] += 1
                 state['ear_counter'] = 0
 
-            # Deteksi pergerakan kepala (pakai nose tip - landmark 86)
-            nose_tip = landmarks[86]
+            # Deteksi pergerakan kepala (pakai nose tip - landmark 86).
+            # .copy() supaya numpy view tidak menahan Face object hidup
+            # di deque (cegah memory leak InsightFace).
+            nose_tip = landmarks[86].copy()
             state['head_positions'].append(nose_tip)
 
             head_moved = False

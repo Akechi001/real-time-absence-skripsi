@@ -1,300 +1,175 @@
-# src/ui/karyawan_list.py - Window Daftar Karyawan dengan CRUD
+# src/ui/karyawan_list.py - Page Karyawan (CustomTkinter)
 
+import os
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
-import sys
-import os
+
+import customtkinter as ctk
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from src.database.operations import get_all_karyawan, delete_karyawan, get_karyawan_by_id
-from src.ui.theme import get_colors, get_button_colors, hover_color
+from src.database.operations import get_all_karyawan, delete_karyawan
 
 
-class KaryawanListWindow:
-    def __init__(self, parent):
-        self.parent = parent
-        self.colors = get_colors()
+CARD_RADIUS = 14
+ACCENT_RED    = "#ef4444"
+ACCENT_GREEN  = "#10b981"
+ACCENT_BLUE   = "#3b82f6"
+ACCENT_ORANGE = "#f59e0b"
+ACCENT_GRAY   = "#6b7280"
 
-        self.window = tk.Toplevel(parent)
-        self.window.title("Daftar Karyawan")
-        self.window.geometry("950x600")
-        self.window.resizable(True, True)
-        self.window.configure(bg=self.colors['bg_primary'])
 
-        self._center_window()
-        self.window.transient(parent)
-        self.window.grab_set()
+class KaryawanListFrame(ctk.CTkFrame):
+    def __init__(self, parent, app=None):
+        super().__init__(parent, corner_radius=0, fg_color="transparent")
+        self.app = app
+        self._build_widgets()
 
-        self._create_widgets()
-        self._load_data()
+    def _build_widgets(self):
+        wrap = ctk.CTkFrame(self, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=36, pady=30)
 
-    def _center_window(self):
-        self.window.update_idletasks()
-        parent_x = self.parent.winfo_x()
-        parent_y = self.parent.winfo_y()
-        parent_w = self.parent.winfo_width()
-        parent_h = self.parent.winfo_height()
+        # ---- HEADER ----
+        header = ctk.CTkFrame(wrap, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 18))
 
-        win_w = self.window.winfo_width()
-        win_h = self.window.winfo_height()
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left")
 
-        x = parent_x + (parent_w // 2) - (win_w // 2)
-        y = parent_y + (parent_h // 2) - (win_h // 2)
-        self.window.geometry(f'+{x}+{y}')
+        ctk.CTkLabel(
+            title_box, text="Karyawan",
+            font=ctk.CTkFont(size=26, weight="bold"),
+            anchor='w',
+        ).pack(anchor='w')
 
-    def _create_widgets(self):
-        main_frame = tk.Frame(
-            self.window,
-            bg=self.colors['bg_primary'],
-            padx=20,
-            pady=20
-        )
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        ctk.CTkLabel(
+            title_box,
+            text="Kelola data karyawan internal & template wajah.",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            anchor='w',
+        ).pack(anchor='w', pady=(4, 0))
 
-        # ========== HEADER ==========
-        header_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        header_frame.pack(fill=tk.X, pady=(0, 15))
+        actions = ctk.CTkFrame(header, fg_color="transparent")
+        actions.pack(side="right")
 
-        title_label = tk.Label(
-            header_frame,
-            text="📋 Daftar Karyawan Terdaftar",
-            font=("Helvetica", 18, "bold"),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_primary']
-        )
-        title_label.pack(side=tk.LEFT)
-
-        btn_refresh = self._create_button(
-            header_frame,
-            text="🔄 Refresh",
-            button_type='blue',
+        ctk.CTkButton(
+            actions, text="🔄  Refresh",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="gray", hover_color="#6b7280",
+            corner_radius=10, height=38,
             command=self._load_data,
-            small=True
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions, text="➕  Tambah Karyawan",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color=ACCENT_GREEN, hover_color="#0ea271",
+            corner_radius=12, height=42,
+            command=self._on_add_karyawan,
+        ).pack(side="left")
+
+        # ---- STATS LABEL ----
+        self.stats_label = ctk.CTkLabel(
+            wrap, text="",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            anchor='w',
         )
-        btn_refresh.pack(side=tk.RIGHT)
+        self.stats_label.pack(fill="x", pady=(0, 10))
 
-        # ========== STATS ==========
-        stats_frame = tk.Frame(
-            main_frame,
-            bg=self.colors['bg_secondary'],
-            relief=tk.FLAT,
-            bd=0,
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        stats_frame.pack(fill=tk.X, pady=(0, 15))
+        # ---- LEGEND ----
+        legend = ctk.CTkFrame(wrap, fg_color="transparent")
+        legend.pack(fill="x", pady=(0, 14))
 
-        self.stats_label = tk.Label(
-            stats_frame,
-            text="",
-            font=("Helvetica", 11),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_secondary'],
-            padx=15,
-            pady=10,
-            anchor="w"
-        )
-        self.stats_label.pack(fill=tk.X)
+        ctk.CTkLabel(
+            legend, text="Keterangan:",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color="gray",
+        ).pack(side="left")
 
-        # ========== LEGEND ==========
-        legend_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        legend_frame.pack(fill=tk.X, pady=(0, 10))
+        self._legend_item(legend, ACCENT_GREEN, "Aktif")
+        self._legend_item(legend, ACCENT_RED,   "Nonaktif")
 
-        tk.Label(
-            legend_frame,
-            text="Keterangan: ",
-            font=("Helvetica", 9, "bold"),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_primary']
-        ).pack(side=tk.LEFT)
+        # ---- TABLE CARD ----
+        table_card = ctk.CTkFrame(wrap, corner_radius=CARD_RADIUS)
+        table_card.pack(fill="both", expand=True)
 
-        self._create_legend_item(legend_frame, self.colors['row_active'], "Aktif & Punya Foto")
-        self._create_legend_item(legend_frame, self.colors['row_no_template'], "Belum Ada Foto")
-        self._create_legend_item(legend_frame, self.colors['row_inactive'], "Nonaktif")
+        table_inner = ctk.CTkFrame(table_card, fg_color="transparent")
+        table_inner.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # ========== TABLE ==========
-        table_frame = tk.Frame(
-            main_frame,
-            bg=self.colors['bg_secondary'],
-            relief=tk.FLAT,
-            bd=1,
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        table_frame.pack(fill=tk.BOTH, expand=True)
+        scrollbar = ttk.Scrollbar(table_inner)
+        scrollbar.pack(side="right", fill="y")
 
-        scrollbar = ttk.Scrollbar(table_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._configure_tree_style()
 
-        style = ttk.Style()
-        style.theme_use('default')
-
-        style.configure(
-            "Custom.Treeview",
-            background=self.colors['bg_secondary'],
-            foreground=self.colors['text_primary'],
-            fieldbackground=self.colors['bg_secondary'],
-            rowheight=32,
-            font=("Helvetica", 10),
-            borderwidth=0
-        )
-        style.configure(
-            "Custom.Treeview.Heading",
-            background=self.colors['header_bg'],
-            foreground=self.colors['header_fg'],
-            font=("Helvetica", 10, "bold"),
-            relief=tk.FLAT,
-            padding=8
-        )
-        style.map(
-            "Custom.Treeview",
-            background=[('selected', self.colors['row_selected'])],
-            foreground=[('selected', self.colors['text_light'])]
-        )
-        style.map(
-            "Custom.Treeview.Heading",
-            background=[('active', self.colors['header_bg'])]
-        )
-
-        columns = ("id", "nip", "nama", "jabatan", "jenis", "template", "status")
+        columns = ("id", "nip", "nama", "jabatan", "status")
         self.tree = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            yscrollcommand=scrollbar.set,
-            selectmode="browse",
-            style="Custom.Treeview"
+            table_inner, columns=columns, show="headings",
+            yscrollcommand=scrollbar.set, selectmode="browse",
+            style="Karyawan.Treeview",
         )
-
         self.tree.heading("id", text="ID")
         self.tree.heading("nip", text="NIP")
         self.tree.heading("nama", text="Nama Karyawan")
         self.tree.heading("jabatan", text="Jabatan")
-        self.tree.heading("jenis", text="Jenis")
-        self.tree.heading("template", text="Foto?")
         self.tree.heading("status", text="Status")
 
-        self.tree.column("id", width=50, anchor="center")
-        self.tree.column("nip", width=110, anchor="center")
-        self.tree.column("nama", width=220, anchor="w")
-        self.tree.column("jabatan", width=140, anchor="w")
-        self.tree.column("jenis", width=90, anchor="center")
-        self.tree.column("template", width=70, anchor="center")
-        self.tree.column("status", width=90, anchor="center")
-
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=1, pady=1)
+        self.tree.column("id", width=60, anchor="center")
+        self.tree.column("nip", width=140, anchor="center")
+        self.tree.column("nama", width=300, anchor="w")
+        self.tree.column("jabatan", width=200, anchor="w")
+        self.tree.column("status", width=120, anchor="center")
+        self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.tree.yview)
 
-        self.tree.tag_configure(
-            "active",
-            background=self.colors['row_active'],
-            foreground=self.colors['text_primary']
-        )
-        self.tree.tag_configure(
-            "inactive",
-            background=self.colors['row_inactive'],
-            foreground=self.colors['text_secondary']
-        )
-        self.tree.tag_configure(
-            "no_template",
-            background=self.colors['row_no_template'],
-            foreground=self.colors['text_primary']
-        )
+        # Zebra row backgrounds + status foreground (warna sesuai legend)
+        self.tree.tag_configure("row_even", background=self._row_even_bg)
+        self.tree.tag_configure("row_odd",  background=self._row_odd_bg)
+        self.tree.tag_configure("active",   foreground=ACCENT_GREEN)
+        self.tree.tag_configure("inactive", foreground=ACCENT_RED)
 
-        # ========== ACTION BUTTONS ==========
-        action_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        action_frame.pack(fill=tk.X, pady=(15, 0))
+        # ---- ACTION FOOTER ----
+        footer = ctk.CTkFrame(wrap, fg_color="transparent")
+        footer.pack(fill="x", pady=(16, 0))
 
-        btn_delete = self._create_button(
-            action_frame,
-            text="🗑️  Hapus Karyawan Terpilih",
-            button_type='red',
-            command=self._on_delete
-        )
-        btn_delete.pack(side=tk.LEFT, padx=(0, 10))
+        ctk.CTkButton(
+            footer, text="🗑️  Hapus Karyawan Terpilih",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=ACCENT_RED, hover_color="#dc2626",
+            corner_radius=10, height=40,
+            command=self._on_delete,
+        ).pack(side="left")
 
-        btn_close = self._create_button(
-            action_frame,
-            text="Tutup",
-            button_type='gray',
-            command=self.window.destroy
-        )
-        btn_close.pack(side=tk.RIGHT)
+        self._load_data()
 
-    def _create_button(self, parent, text, button_type, command, small=False):
-        btn_colors = get_button_colors(button_type)
-        bg_color = btn_colors['bg']
-        fg_color = btn_colors['fg']
+    def on_show(self):
+        self._load_data()
 
-        font_size = 10 if small else 11
-        padx = 12 if small else 18
-        pady = 8 if small else 12
+    def refresh(self):
+        """Auto-refresh hook — reload tabel tapi pertahankan baris yang user
+        sedang pilih (kalau ada), supaya tombol Hapus tidak kehilangan target.
+        """
+        selected_id = None
+        sel = self.tree.selection()
+        if sel:
+            vals = self.tree.item(sel[0]).get('values')
+            if vals:
+                selected_id = vals[0]
 
-        # macOS workaround: pakai Label dalam Frame sebagai tombol
-        btn_container = tk.Frame(
-            parent,
-            bg=bg_color,
-            highlightthickness=0,
-            bd=0,
-            cursor='hand2'
-        )
+        self._load_data()
 
-        btn = tk.Label(
-            btn_container,
-            text=text,
-            font=("Helvetica", font_size, "bold"),
-            bg=bg_color,
-            fg=fg_color,
-            cursor='hand2',
-            padx=padx,
-            pady=pady
-        )
-        btn.pack(fill=tk.BOTH, expand=True)
+        if selected_id is not None:
+            for item in self.tree.get_children():
+                vals = self.tree.item(item).get('values')
+                if vals and vals[0] == selected_id:
+                    self.tree.selection_set(item)
+                    break
 
-        def on_click(e):
-            command()
-
-        def on_enter(e):
-            new_color = hover_color(bg_color)
-            btn_container.config(bg=new_color)
-            btn.config(bg=new_color)
-
-        def on_leave(e):
-            btn_container.config(bg=bg_color)
-            btn.config(bg=bg_color)
-
-        btn.bind("<Button-1>", on_click)
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        btn_container.bind("<Button-1>", on_click)
-        btn_container.bind("<Enter>", on_enter)
-        btn_container.bind("<Leave>", on_leave)
-
-        return btn_container
-
-    def _create_legend_item(self, parent, color, text):
-        item_frame = tk.Frame(parent, bg=self.colors['bg_primary'])
-        item_frame.pack(side=tk.LEFT, padx=(10, 0))
-
-        color_box = tk.Frame(
-            item_frame,
-            bg=color,
-            width=15,
-            height=15,
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        color_box.pack(side=tk.LEFT, padx=(0, 5))
-        color_box.pack_propagate(False)
-
-        tk.Label(
-            item_frame,
-            text=text,
-            font=("Helvetica", 9),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_primary']
-        ).pack(side=tk.LEFT)
+    # ============================================================
+    # DATA
+    # ============================================================
 
     def _load_data(self):
         for item in self.tree.get_children():
@@ -302,39 +177,39 @@ class KaryawanListWindow:
 
         karyawan_list = get_all_karyawan()
 
-        for k in karyawan_list:
-            template_status = "✓" if k['has_template'] else "✗"
-            status_text = "Aktif" if k['status_aktif'] else "Nonaktif"
-
-            if not k['status_aktif']:
-                tag = "inactive"
-            elif not k['has_template']:
-                tag = "no_template"
+        for i, k in enumerate(karyawan_list):
+            if k['status_aktif']:
+                status_badge = "●  Aktif"
+                status_tag = "active"
             else:
-                tag = "active"
+                status_badge = "●  Nonaktif"
+                status_tag = "inactive"
+
+            zebra = "row_even" if i % 2 == 0 else "row_odd"
 
             self.tree.insert(
-                "",
-                tk.END,
-                values=(
-                    k['id_karyawan'],
-                    k['nip'],
-                    k['nama'],
-                    k['jabatan'],
-                    k['jenis_karyawan'],
-                    template_status,
-                    status_text
-                ),
-                tags=(tag,)
+                "", "end",
+                values=(k['id_karyawan'], k['nip'], k['nama'],
+                        k['jabatan'], status_badge),
+                tags=(zebra, status_tag),
             )
 
         total = len(karyawan_list)
         active = sum(1 for k in karyawan_list if k['status_aktif'])
-        with_template = sum(1 for k in karyawan_list if k['has_template'])
 
-        self.stats_label.config(
-            text=f"📊 Total: {total} karyawan   |   ✓ Aktif: {active}   |   📷 Punya Foto: {with_template}"
+        self.stats_label.configure(
+            text=f"📊 Total: {total} karyawan   ·   "
+                 f"✓ Aktif: {active}   ·   "
+                 f"✗ Nonaktif: {total - active}"
         )
+
+    # ============================================================
+    # ACTIONS
+    # ============================================================
+
+    def _on_add_karyawan(self):
+        from src.ui.enrollment_window import open_enrollment_window
+        open_enrollment_window(self.winfo_toplevel())
 
     def _on_delete(self):
         selected = self.tree.selection()
@@ -349,46 +224,77 @@ class KaryawanListWindow:
         values = item['values']
         id_karyawan = values[0]
         nama = values[2]
-        status = values[6]
+        status = values[4]
 
-        if status == "Nonaktif":
+        if "Nonaktif" in str(status):
             messagebox.showinfo(
                 "Sudah Nonaktif",
-                f"Karyawan '{nama}' sudah dalam status nonaktif."
+                f"Karyawan '{nama}' sudah nonaktif."
             )
             return
 
         confirm = messagebox.askyesno(
             "Konfirmasi Hapus",
-            f"Yakin ingin menghapus karyawan berikut?\n\n"
+            f"Yakin hapus karyawan berikut?\n\n"
             f"ID: {id_karyawan}\n"
             f"Nama: {nama}\n\n"
             f"Karyawan akan dinonaktifkan dan template foto dihapus.\n"
-            f"Log absensi historis tetap dipertahankan.\n\n"
-            f"Tindakan ini tidak dapat dibatalkan."
+            f"Log absensi historis tetap dipertahankan."
         )
-
         if not confirm:
             return
 
-        success = delete_karyawan(id_karyawan)
-
-        if success:
-            messagebox.showinfo(
-                "Berhasil",
-                f"Karyawan '{nama}' berhasil dinonaktifkan."
-            )
+        if delete_karyawan(id_karyawan):
+            messagebox.showinfo("Berhasil", f"Karyawan '{nama}' dinonaktifkan.")
             self._load_data()
         else:
-            messagebox.showerror(
-                "Gagal",
-                f"Gagal menghapus karyawan '{nama}'.\n"
-                f"Cek konsol untuk detail error."
-            )
+            messagebox.showerror("Gagal", f"Gagal menghapus '{nama}'.")
 
-def is_macos():
-    """Check apakah running di macOS"""
-    return platform.system() == "Darwin"
+    # ============================================================
+    # STYLE / WIDGETS
+    # ============================================================
 
-def open_karyawan_list(parent):
-    KaryawanListWindow(parent)
+    def _legend_item(self, parent, color, text):
+        item = ctk.CTkFrame(parent, fg_color="transparent")
+        item.pack(side="left", padx=(14, 0))
+
+        dot = ctk.CTkFrame(item, width=12, height=12, corner_radius=6, fg_color=color)
+        dot.pack(side="left", padx=(0, 8))
+        dot.pack_propagate(False)
+
+        ctk.CTkLabel(
+            item, text=text,
+            font=ctk.CTkFont(size=11),
+            text_color=color,
+        ).pack(side="left")
+
+    def _configure_tree_style(self):
+        style = ttk.Style()
+        is_dark = ctk.get_appearance_mode() == "Dark"
+
+        bg          = "#1f1f2e" if is_dark else "#ffffff"
+        row_even_bg = "#1f1f2e" if is_dark else "#ffffff"
+        row_odd_bg  = "#252535" if is_dark else "#f9fafb"
+        fg          = "#e5e7eb" if is_dark else "#111827"
+        head_bg     = "#2a2a3e" if is_dark else "#f3f4f6"
+        head_fg     = "#e5e7eb" if is_dark else "#374151"
+
+        style.theme_use('default')
+        style.configure(
+            "Karyawan.Treeview",
+            background=bg, foreground=fg, fieldbackground=bg,
+            rowheight=40, font=("Helvetica", 11), borderwidth=0,
+        )
+        style.configure(
+            "Karyawan.Treeview.Heading",
+            background=head_bg, foreground=head_fg,
+            font=("Helvetica", 10, "bold"),
+            relief="flat", padding=(12, 14), borderwidth=0,
+        )
+        style.map(
+            "Karyawan.Treeview",
+            background=[('selected', ACCENT_BLUE)],
+            foreground=[('selected', '#ffffff')],
+        )
+        self._row_even_bg = row_even_bg
+        self._row_odd_bg = row_odd_bg

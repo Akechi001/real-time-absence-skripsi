@@ -104,6 +104,17 @@ LIGHT_THEME = {
 
     'header_bg': '#5b9bd5',
     'header_fg': '#ffffff',
+
+    # SaaS dashboard
+    'sidebar_bg':            '#1f2937',  # dark navy
+    'sidebar_item_fg':       '#9ca3af',  # muted gray for inactive
+    'sidebar_item_hover_bg': '#374151',
+    'sidebar_item_active_bg':'#3b82f6',  # blue accent
+    'sidebar_item_active_fg':'#ffffff',
+    'sidebar_logo_fg':       '#ffffff',
+    'sidebar_section_fg':    '#6b7280',  # for "MAIN" labels etc
+    'page_bg':               '#f9fafb',  # lighter than bg_primary
+    'page_header_fg':        '#111827',
 }
 
 
@@ -146,6 +157,17 @@ DARK_THEME = {
 
     'header_bg': '#4a7ba5',
     'header_fg': '#ffffff',
+
+    # SaaS dashboard (dark variant)
+    'sidebar_bg':            '#0f172a',  # deeper navy
+    'sidebar_item_fg':       '#94a3b8',
+    'sidebar_item_hover_bg': '#1e293b',
+    'sidebar_item_active_bg':'#3b82f6',
+    'sidebar_item_active_fg':'#ffffff',
+    'sidebar_logo_fg':       '#f1f5f9',
+    'sidebar_section_fg':    '#64748b',
+    'page_bg':               '#1e1e2e',  # match bg_primary
+    'page_header_fg':        '#f1f5f9',
 }
 
 

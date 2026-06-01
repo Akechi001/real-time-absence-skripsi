@@ -1,503 +1,506 @@
-# src/ui/log_absensi.py - Window Log Absensi dengan Filter
+# src/ui/log_absensi.py - Page Log Absensi (CustomTkinter, 2 tab)
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
 import csv
-from datetime import datetime
-import sys
 import os
+import sys
+import tkinter as tk
+from datetime import datetime
+from tkinter import ttk, messagebox, filedialog
+
+import customtkinter as ctk
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from src.database.operations import get_log_absensi, get_log_stats, get_karyawan_dropdown_list
-from src.ui.theme import get_colors, get_button_colors, hover_color
+from src.database.operations import (
+    get_log_absensi, get_karyawan_dropdown_list,
+    get_absensi_harian, resolve_pending,
+)
 
 
-class LogAbsensiWindow:
-    def __init__(self, parent):
-        self.parent = parent
-        self.colors = get_colors()
+CARD_RADIUS = 14
+ACCENT_BLUE = "#3b82f6"
+ACCENT_GREEN = "#10b981"
+ACCENT_RED = "#ef4444"
+ACCENT_ORANGE = "#f59e0b"
+ACCENT_PURPLE = "#8b5cf6"
+ACCENT_GRAY = "#6b7280"
 
-        self.window = tk.Toplevel(parent)
-        self.window.title("Log Absensi")
-        self.window.geometry("1100x700")
-        self.window.resizable(True, True)
-        self.window.minsize(900, 600)
-        self.window.configure(bg=self.colors['bg_primary'])
 
-        self._center_window()
-        self.window.transient(parent)
-        self.window.grab_set()
+class LogAbsensiFrame(ctk.CTkFrame):
+    def __init__(self, parent, app=None):
+        super().__init__(parent, corner_radius=0, fg_color="transparent")
+        self.app = app
 
-        self.filter_date = tk.StringVar(value='today')
-        self.filter_karyawan = tk.StringVar(value='Semua Karyawan')
-        self.filter_event = tk.StringVar(value='all')
+        # Tab Absensi Harian state
+        self.h_filter_date = tk.StringVar(value='month')
+        self.h_filter_karyawan = tk.StringVar(value='Semua Karyawan')
+        self.h_filter_status = tk.StringVar(value='all')
+        # Tab Raw Lewatan state
+        self.l_filter_date = tk.StringVar(value='today')
+        self.l_filter_karyawan = tk.StringVar(value='Semua Karyawan')
+        self.l_filter_event = tk.StringVar(value='all')
 
         self.karyawan_list = []
 
-        self._create_widgets()
+        self._build_widgets()
         self._load_karyawan_dropdown()
-        self._load_data()
+        self._run_lazy_resolve()
+        self._load_harian_data()
+        self._load_lewatan_data()
 
-    def _center_window(self):
-        self.window.update_idletasks()
-        parent_x = self.parent.winfo_x()
-        parent_y = self.parent.winfo_y()
-        parent_w = self.parent.winfo_width()
-        parent_h = self.parent.winfo_height()
+    def on_show(self):
+        # Selalu cek tanggal yang belum di-resolve setiap visit page.
+        # Idempotent (resolve_log skip tanggal yang sudah jalan), jadi cheap.
+        # Penting buat skenario "midnight passes while app open" — supaya
+        # tanggal baru yang lewat dari today bisa auto-resolve.
+        self._run_lazy_resolve()
+        self._load_harian_data()
+        self._load_lewatan_data()
 
-        win_w = self.window.winfo_width()
-        win_h = self.window.winfo_height()
+    def refresh(self):
+        """Auto-refresh hook (dipanggil DashboardApp tiap ~5 detik)."""
+        self._run_lazy_resolve()
+        self._load_harian_data()
+        self._load_lewatan_data()
 
-        x = parent_x + (parent_w // 2) - (win_w // 2)
-        y = parent_y + (parent_h // 2) - (win_h // 2)
-        self.window.geometry(f'+{x}+{y}')
+    # ============================================================
+    # LAYOUT
+    # ============================================================
 
-    def _create_widgets(self):
-        main_frame = tk.Frame(
-            self.window,
-            bg=self.colors['bg_primary'],
-            padx=20,
-            pady=20
-        )
-        main_frame.pack(fill=tk.BOTH, expand=True)
+    def _build_widgets(self):
+        wrap = ctk.CTkFrame(self, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=36, pady=30)
 
-        # ========== HEADER ==========
-        header_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        header_frame.pack(fill=tk.X, pady=(0, 15))
+        # ---- HEADER ----
+        header = ctk.CTkFrame(wrap, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 20))
 
-        title_label = tk.Label(
-            header_frame,
-            text="Log Absensi",
-            font=("Helvetica", 18, "bold"),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_primary']
-        )
-        title_label.pack(side=tk.LEFT)
+        title_box = ctk.CTkFrame(header, fg_color="transparent")
+        title_box.pack(side="left")
 
-        right_btn_frame = tk.Frame(header_frame, bg=self.colors['bg_primary'])
-        right_btn_frame.pack(side=tk.RIGHT)
+        ctk.CTkLabel(
+            title_box, text="Log Absensi",
+            font=ctk.CTkFont(size=26, weight="bold"),
+            anchor='w',
+        ).pack(anchor='w')
 
-        btn_export = self._create_button(
-            right_btn_frame,
-            text="Export CSV",
-            button_type='purple',
+        ctk.CTkLabel(
+            title_box,
+            text="Riwayat absensi harian dan lewatan kamera.",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            anchor='w',
+        ).pack(anchor='w', pady=(4, 0))
+
+        actions = ctk.CTkFrame(header, fg_color="transparent")
+        actions.pack(side="right")
+
+        ctk.CTkButton(
+            actions, text="🔄  Refresh",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="gray", hover_color="#6b7280",
+            corner_radius=10, height=38,
+            command=self._refresh_all,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions, text="📥  Export CSV",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=ACCENT_PURPLE, hover_color="#7c3aed",
+            corner_radius=10, height=38,
             command=self._on_export_csv,
-            small=True
+        ).pack(side="left")
+
+        # ---- TABVIEW ----
+        self.tabview = ctk.CTkTabview(
+            wrap, corner_radius=CARD_RADIUS,
+            segmented_button_selected_color=ACCENT_BLUE,
         )
-        btn_export.pack(side=tk.LEFT, padx=(0, 5))
+        self.tabview.pack(fill="both", expand=True)
 
-        btn_refresh = self._create_button(
-            right_btn_frame,
-            text="Refresh",
-            button_type='blue',
-            command=self._load_data,
-            small=True
-        )
-        btn_refresh.pack(side=tk.LEFT)
+        self.tabview.add("Absensi Harian")
+        self.tabview.add("Raw Lewatan")
 
-        # ========== STATS CARDS ==========
-        stats_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        stats_frame.pack(fill=tk.X, pady=(0, 15))
+        self._build_harian_tab(self.tabview.tab("Absensi Harian"))
+        self._build_lewatan_tab(self.tabview.tab("Raw Lewatan"))
 
-        self.stats_total_label = self._create_stat_card(stats_frame, "Total Log", "0", self.colors['btn_blue'])
-        self.stats_today_label = self._create_stat_card(stats_frame, "Hari Ini", "0", self.colors['btn_green'])
-        self.stats_checkin_label = self._create_stat_card(stats_frame, "Check-In", "0", self.colors['btn_orange'])
-        self.stats_checkout_label = self._create_stat_card(stats_frame, "Check-Out", "0", self.colors['btn_purple'])
+    # ============================================================
+    # TAB ABSENSI HARIAN
+    # ============================================================
 
-        # ========== FILTER BAR ==========
-        filter_frame = tk.Frame(
-            main_frame,
-            bg=self.colors['bg_secondary'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        filter_frame.pack(fill=tk.X, pady=(0, 15))
+    def _build_harian_tab(self, parent):
+        wrap = ctk.CTkFrame(parent, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=4, pady=8)
 
-        filter_inner = tk.Frame(
-            filter_frame,
-            bg=self.colors['bg_secondary'],
-            padx=15,
-            pady=12
-        )
-        filter_inner.pack(fill=tk.X)
+        # Filter slim
+        filter_card = ctk.CTkFrame(wrap, corner_radius=10, height=56)
+        filter_card.pack(fill="x", pady=(0, 12))
+        filter_card.pack_propagate(False)
 
-        tk.Label(
-            filter_inner,
-            text="Filter:",
-            font=("Helvetica", 10, "bold"),
-            fg=self.colors['text_primary'],
-            bg=self.colors['bg_secondary']
-        ).pack(side=tk.LEFT, padx=(0, 15))
+        inner = ctk.CTkFrame(filter_card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=14, pady=8)
 
-        tk.Label(
-            filter_inner,
-            text="Tanggal:",
-            font=("Helvetica", 10),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_secondary']
-        ).pack(side=tk.LEFT, padx=(0, 5))
+        ctk.CTkLabel(
+            inner, text="🔍",
+            font=ctk.CTkFont(size=14),
+            text_color="gray",
+        ).pack(side="left", padx=(2, 10))
 
-        date_combo = ttk.Combobox(
-            filter_inner,
-            textvariable=self.filter_date,
-            values=['today', 'week', 'month', 'all'],
-            state='readonly',
-            width=10,
-            font=("Helvetica", 10)
-        )
-        date_combo.pack(side=tk.LEFT, padx=(0, 15))
-        date_combo.bind('<<ComboboxSelected>>', lambda e: self._load_data())
+        self._inline_combo(inner, self.h_filter_date,
+                           ['today', 'week', 'month', 'all'],
+                           self._load_harian_data, width=110)
 
-        tk.Label(
-            filter_inner,
-            text="Karyawan:",
-            font=("Helvetica", 10),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_secondary']
-        ).pack(side=tk.LEFT, padx=(0, 5))
-
-        self.karyawan_combo = ttk.Combobox(
-            filter_inner,
-            textvariable=self.filter_karyawan,
-            state='readonly',
-            width=25,
-            font=("Helvetica", 10)
-        )
-        self.karyawan_combo.pack(side=tk.LEFT, padx=(0, 15))
-        self.karyawan_combo.bind('<<ComboboxSelected>>', lambda e: self._load_data())
-
-        tk.Label(
-            filter_inner,
-            text="Event:",
-            font=("Helvetica", 10),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_secondary']
-        ).pack(side=tk.LEFT, padx=(0, 5))
-
-        event_combo = ttk.Combobox(
-            filter_inner,
-            textvariable=self.filter_event,
-            values=['all', 'check-in', 'check-out'],
-            state='readonly',
-            width=12,
-            font=("Helvetica", 10)
-        )
-        event_combo.pack(side=tk.LEFT, padx=(0, 15))
-        event_combo.bind('<<ComboboxSelected>>', lambda e: self._load_data())
-
-        btn_reset = self._create_button(
-            filter_inner,
-            text="Reset",
-            button_type='gray',
-            command=self._on_reset_filter,
-            small=True
-        )
-        btn_reset.pack(side=tk.LEFT)
-
-        # ========== TABLE ==========
-        table_frame = tk.Frame(
-            main_frame,
-            bg=self.colors['bg_secondary'],
-            highlightbackground=self.colors['border'],
-            highlightthickness=1
-        )
-        table_frame.pack(fill=tk.BOTH, expand=True)
-
-        scrollbar = ttk.Scrollbar(table_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        style = ttk.Style()
-        style.theme_use('default')
-
-        style.configure(
-            "Log.Treeview",
-            background=self.colors['bg_secondary'],
-            foreground=self.colors['text_primary'],
-            fieldbackground=self.colors['bg_secondary'],
-            rowheight=30,
-            font=("Helvetica", 10),
-            borderwidth=0
-        )
-        style.configure(
-            "Log.Treeview.Heading",
-            background=self.colors['header_bg'],
-            foreground=self.colors['header_fg'],
-            font=("Helvetica", 10, "bold"),
-            relief=tk.FLAT,
-            padding=8
-        )
-        style.map(
-            "Log.Treeview",
-            background=[('selected', self.colors['row_selected'])],
-            foreground=[('selected', self.colors['text_light'])]
-        )
-        style.map(
-            "Log.Treeview.Heading",
-            background=[('active', self.colors['header_bg'])]
+        self.h_karyawan_combo = self._inline_combo(
+            inner, self.h_filter_karyawan,
+            ['Semua Karyawan'], self._load_harian_data, width=200,
         )
 
-        columns = ("timestamp", "nip", "nama", "jabatan", "event", "confidence", "liveness")
-        self.tree = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            yscrollcommand=scrollbar.set,
-            selectmode="browse",
-            style="Log.Treeview"
+        self._inline_combo(inner, self.h_filter_status,
+                           ['all', 'terlambat', 'pulang_cepat',
+                            'terlambat_atau_cepat', 'normal', 'tidak_lengkap'],
+                           self._load_harian_data, width=170)
+
+        ctk.CTkButton(
+            inner, text="↺",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="transparent", hover_color=("#e5e7eb", "#374151"),
+            text_color="gray",
+            corner_radius=8, height=38, width=38,
+            command=self._on_reset_harian_filter,
+        ).pack(side="right")
+
+        # Table
+        table_card = ctk.CTkFrame(wrap, corner_radius=CARD_RADIUS)
+        table_card.pack(fill="both", expand=True)
+
+        table_inner = ctk.CTkFrame(table_card, fg_color="transparent")
+        table_inner.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scrollbar = ttk.Scrollbar(table_inner)
+        scrollbar.pack(side="right", fill="y")
+
+        self._configure_tree_style("Harian.Treeview")
+        cols = ("tanggal", "nip", "nama", "jabatan", "check_in", "check_out", "status", "keterangan")
+        self.h_tree = ttk.Treeview(
+            table_inner, columns=cols, show="headings",
+            yscrollcommand=scrollbar.set, selectmode="browse",
+            style="Harian.Treeview",
+        )
+        for c, h in zip(cols, ["Tanggal", "NIP", "Nama", "Jabatan",
+                               "Check-In", "Check-Out", "Status", "Keterangan"]):
+            self.h_tree.heading(c, text=h)
+        widths = [100, 90, 180, 130, 90, 90, 130, 220]
+        anchors = ["center", "center", "w", "w", "center", "center", "center", "w"]
+        for c, w, a in zip(cols, widths, anchors):
+            self.h_tree.column(c, width=w, anchor=a)
+        self.h_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.h_tree.yview)
+
+        self.h_tree.tag_configure("row_even", background=self._row_even_bg)
+        self.h_tree.tag_configure("row_odd", background=self._row_odd_bg)
+        self.h_tree.tag_configure("normal", foreground=ACCENT_GREEN)
+        self.h_tree.tag_configure("terlambat", foreground=ACCENT_RED)
+        self.h_tree.tag_configure("cepat", foreground=ACCENT_ORANGE)
+        self.h_tree.tag_configure("tidak_lengkap", foreground=ACCENT_GRAY)
+
+        self.h_info_label = ctk.CTkLabel(
+            wrap, text="", font=ctk.CTkFont(size=10), text_color="gray", anchor='w',
+        )
+        self.h_info_label.pack(fill="x", pady=(8, 0))
+
+    def _load_harian_data(self):
+        for item in self.h_tree.get_children():
+            self.h_tree.delete(item)
+
+        karyawan_id = self._parse_karyawan_id(self.h_filter_karyawan.get())
+        rows = get_absensi_harian(
+            filter_date=self.h_filter_date.get(),
+            filter_karyawan_id=karyawan_id,
+            filter_status=self.h_filter_status.get(),
+            limit=500,
         )
 
-        self.tree.heading("timestamp", text="Waktu")
-        self.tree.heading("nip", text="NIP")
-        self.tree.heading("nama", text="Nama")
-        self.tree.heading("jabatan", text="Jabatan")
-        self.tree.heading("event", text="Event")
-        self.tree.heading("confidence", text="Confidence")
-        self.tree.heading("liveness", text="Liveness")
+        for i, r in enumerate(rows):
+            ci = r['check_in_time'].strftime('%H:%M:%S') if r['check_in_time'] else '—'
+            co = r['check_out_time'].strftime('%H:%M:%S') if r['check_out_time'] else '—'
 
-        self.tree.column("timestamp", width=160, anchor="center")
-        self.tree.column("nip", width=80, anchor="center")
-        self.tree.column("nama", width=200, anchor="w")
-        self.tree.column("jabatan", width=140, anchor="w")
-        self.tree.column("event", width=100, anchor="center")
-        self.tree.column("confidence", width=100, anchor="center")
-        self.tree.column("liveness", width=80, anchor="center")
+            if r['check_in_time'] is None or r['check_out_time'] is None:
+                status, status_tag = "⚠  Tidak Lengkap", "tidak_lengkap"
+            elif r['status_terlambat'] and r['status_pulang_cepat']:
+                status, status_tag = "⏰  Terlambat + Cepat", "terlambat"
+            elif r['status_terlambat']:
+                status, status_tag = "⏰  Terlambat", "terlambat"
+            elif r['status_pulang_cepat']:
+                status, status_tag = "🏃  Pulang Cepat", "cepat"
+            else:
+                status, status_tag = "✓  Normal", "normal"
 
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=1, pady=1)
-        scrollbar.config(command=self.tree.yview)
+            zebra = "row_even" if i % 2 == 0 else "row_odd"
+            self.h_tree.insert("", "end",
+                values=(r['tanggal'].strftime('%Y-%m-%d'),
+                        r['nip'], r['nama'], r['jabatan'] or '-',
+                        ci, co, status, r['keterangan']),
+                tags=(zebra, status_tag))
 
-        self.tree.tag_configure(
-            "checkin",
-            background=self.colors['bg_secondary'],
-            foreground=self.colors['btn_green']
-        )
-        self.tree.tag_configure(
-            "checkout",
-            background=self.colors['bg_secondary'],
-            foreground=self.colors['btn_orange']
+        self.h_info_label.configure(
+            text=f"Menampilkan {len(rows)} hari absensi (max 500)  ·  "
+                 f"periode: {self.h_filter_date.get()}  ·  "
+                 f"status: {self.h_filter_status.get()}"
         )
 
-        # ========== INFO BAR ==========
-        self.info_label = tk.Label(
-            main_frame,
-            text="",
-            font=("Helvetica", 9),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_primary']
-        )
-        self.info_label.pack(fill=tk.X, pady=(10, 0))
+    def _on_reset_harian_filter(self):
+        self.h_filter_date.set('month')
+        self.h_filter_karyawan.set('Semua Karyawan')
+        self.h_filter_status.set('all')
+        self._load_harian_data()
 
-        # ========== CLOSE BUTTON ==========
-        close_frame = tk.Frame(main_frame, bg=self.colors['bg_primary'])
-        close_frame.pack(fill=tk.X, pady=(10, 0))
+    # ============================================================
+    # TAB RAW LEWATAN
+    # ============================================================
 
-        btn_close = self._create_button(
-            close_frame,
-            text="Tutup",
-            button_type='gray',
-            command=self.window.destroy
-        )
-        btn_close.pack(side=tk.RIGHT)
+    def _build_lewatan_tab(self, parent):
+        wrap = ctk.CTkFrame(parent, fg_color="transparent")
+        wrap.pack(fill="both", expand=True, padx=4, pady=8)
 
-    def _create_stat_card(self, parent, title, value, color):
-        card = tk.Frame(
-            parent,
-            bg=self.colors['bg_secondary'],
-            highlightbackground=color,
-            highlightthickness=2
-        )
-        card.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ctk.CTkLabel(
+            wrap,
+            text="Setiap deteksi kamera = 1 baris lewatan. "
+                 "Belum jadi keputusan absensi — lihat tab Absensi Harian.",
+            font=ctk.CTkFont(size=10, slant="italic"),
+            text_color="gray", anchor="w",
+        ).pack(fill="x", pady=(0, 10))
 
-        title_lbl = tk.Label(
-            card,
-            text=title,
-            font=("Helvetica", 9, "bold"),
-            fg=self.colors['text_secondary'],
-            bg=self.colors['bg_secondary'],
-            pady=8
-        )
-        title_lbl.pack()
+        # Filter slim
+        filter_card = ctk.CTkFrame(wrap, corner_radius=10, height=56)
+        filter_card.pack(fill="x", pady=(0, 12))
+        filter_card.pack_propagate(False)
 
-        value_lbl = tk.Label(
-            card,
-            text=value,
-            font=("Helvetica", 18, "bold"),
-            fg=color,
-            bg=self.colors['bg_secondary'],
-            pady=5
-        )
-        value_lbl.pack(pady=(0, 8))
+        inner = ctk.CTkFrame(filter_card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=14, pady=8)
 
-        return value_lbl
+        ctk.CTkLabel(
+            inner, text="🔍",
+            font=ctk.CTkFont(size=14),
+            text_color="gray",
+        ).pack(side="left", padx=(2, 10))
 
-    def _create_button(self, parent, text, button_type, command, small=False):
-        btn_colors = get_button_colors(button_type)
-        bg_color = btn_colors['bg']
-        fg_color = btn_colors['fg']
+        self._inline_combo(inner, self.l_filter_date,
+                           ['today', 'week', 'month', 'all'],
+                           self._load_lewatan_data, width=110)
 
-        font_size = 10 if small else 11
-        padx = 12 if small else 18
-        pady = 6 if small else 10
-
-        btn_container = tk.Frame(
-            parent,
-            bg=bg_color,
-            highlightthickness=0,
-            bd=0,
-            cursor='hand2'
+        self.l_karyawan_combo = self._inline_combo(
+            inner, self.l_filter_karyawan,
+            ['Semua Karyawan'], self._load_lewatan_data, width=200,
         )
 
-        btn = tk.Label(
-            btn_container,
-            text=text,
-            font=("Helvetica", font_size, "bold"),
-            bg=bg_color,
-            fg=fg_color,
-            cursor='hand2',
-            padx=padx,
-            pady=pady
+        self._inline_combo(inner, self.l_filter_event,
+                           ['all', 'passage', 'check-in', 'check-out'],
+                           self._load_lewatan_data, width=130)
+
+        ctk.CTkButton(
+            inner, text="↺",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="transparent", hover_color=("#e5e7eb", "#374151"),
+            text_color="gray",
+            corner_radius=8, height=38, width=38,
+            command=self._on_reset_lewatan_filter,
+        ).pack(side="right")
+
+        # Table
+        table_card = ctk.CTkFrame(wrap, corner_radius=CARD_RADIUS)
+        table_card.pack(fill="both", expand=True)
+
+        table_inner = ctk.CTkFrame(table_card, fg_color="transparent")
+        table_inner.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scrollbar = ttk.Scrollbar(table_inner)
+        scrollbar.pack(side="right", fill="y")
+
+        self._configure_tree_style("Lewatan.Treeview")
+        cols = ("timestamp", "nip", "nama", "jabatan", "event", "confidence", "liveness")
+        self.l_tree = ttk.Treeview(
+            table_inner, columns=cols, show="headings",
+            yscrollcommand=scrollbar.set, selectmode="browse",
+            style="Lewatan.Treeview",
         )
-        btn.pack(fill=tk.BOTH, expand=True)
+        for c, h in zip(cols, ["Waktu", "NIP", "Nama", "Jabatan",
+                               "Event", "Confidence", "Liveness"]):
+            self.l_tree.heading(c, text=h)
+        widths = [160, 90, 200, 140, 100, 100, 80]
+        anchors = ["center", "center", "w", "w", "center", "center", "center"]
+        for c, w, a in zip(cols, widths, anchors):
+            self.l_tree.column(c, width=w, anchor=a)
+        self.l_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.l_tree.yview)
 
-        def on_click(e):
-            command()
+        self.l_tree.tag_configure("row_even", background=self._row_even_bg)
+        self.l_tree.tag_configure("row_odd", background=self._row_odd_bg)
+        self.l_tree.tag_configure("passage", foreground=ACCENT_BLUE)
+        self.l_tree.tag_configure("checkin", foreground=ACCENT_GREEN)
+        self.l_tree.tag_configure("checkout", foreground=ACCENT_ORANGE)
 
-        def on_enter(e):
-            new_color = hover_color(bg_color)
-            btn_container.config(bg=new_color)
-            btn.config(bg=new_color)
+        self.l_info_label = ctk.CTkLabel(
+            wrap, text="", font=ctk.CTkFont(size=10), text_color="gray", anchor='w',
+        )
+        self.l_info_label.pack(fill="x", pady=(8, 0))
 
-        def on_leave(e):
-            btn_container.config(bg=bg_color)
-            btn.config(bg=bg_color)
+    def _load_lewatan_data(self):
+        for item in self.l_tree.get_children():
+            self.l_tree.delete(item)
 
-        btn.bind("<Button-1>", on_click)
-        btn.bind("<Enter>", on_enter)
-        btn.bind("<Leave>", on_leave)
-        btn_container.bind("<Button-1>", on_click)
-        btn_container.bind("<Enter>", on_enter)
-        btn_container.bind("<Leave>", on_leave)
+        karyawan_id = self._parse_karyawan_id(self.l_filter_karyawan.get())
+        logs = get_log_absensi(
+            filter_date=self.l_filter_date.get(),
+            filter_karyawan_id=karyawan_id,
+            filter_event=self.l_filter_event.get(),
+            limit=500,
+        )
 
-        return btn_container
+        for i, log in enumerate(logs):
+            evt = log['jenis_event']
+            evt_tag = ("checkin" if evt == 'check-in'
+                       else "checkout" if evt == 'check-out'
+                       else "passage")
+            zebra = "row_even" if i % 2 == 0 else "row_odd"
+
+            self.l_tree.insert("", "end",
+                values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                        log['nip'], log['nama'], log['jabatan'] or '-',
+                        evt.upper(), f"{log['confidence_score']:.4f}",
+                        "Live" if log['status_liveness'] else "Spoof"),
+                tags=(zebra, evt_tag))
+
+        self.l_info_label.configure(
+            text=f"Menampilkan {len(logs)} lewatan (max 500)  ·  "
+                 f"tanggal: {self.l_filter_date.get()}  ·  "
+                 f"event: {self.l_filter_event.get()}"
+        )
+
+    def _on_reset_lewatan_filter(self):
+        self.l_filter_date.set('today')
+        self.l_filter_karyawan.set('Semua Karyawan')
+        self.l_filter_event.set('all')
+        self._load_lewatan_data()
+
+    # ============================================================
+    # SHARED
+    # ============================================================
+
+    def _run_lazy_resolve(self):
+        try:
+            result = resolve_pending()
+            if result:
+                total = sum(result.values())
+                print(f"[lazy_resolve] {len(result)} tanggal di-resolve "
+                      f"(total {total} karyawan)")
+        except Exception as e:
+            print(f"[lazy_resolve] error: {e}")
 
     def _load_karyawan_dropdown(self):
         self.karyawan_list = get_karyawan_dropdown_list()
+        options = ['Semua Karyawan'] + [
+            f"{k['nama']} (ID: {k['id']})" for k in self.karyawan_list
+        ]
+        self.h_karyawan_combo.configure(values=options)
+        self.l_karyawan_combo.configure(values=options)
 
-        options = ['Semua Karyawan']
-        for k in self.karyawan_list:
-            options.append(f"{k['nama']} (ID: {k['id']})")
-
-        self.karyawan_combo['values'] = options
-
-    def _get_filter_karyawan_id(self):
-        selection = self.filter_karyawan.get()
+    def _parse_karyawan_id(self, selection):
         if selection == 'Semua Karyawan':
             return None
-
         try:
-            id_part = selection.split('ID: ')[1].rstrip(')')
-            return int(id_part)
+            return int(selection.split('ID: ')[1].rstrip(')'))
         except (IndexError, ValueError):
             return None
 
-    def _load_data(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        stats = get_log_stats()
-        if stats:
-            self.stats_total_label.config(text=str(stats['total']))
-            self.stats_today_label.config(text=str(stats['today']))
-            self.stats_checkin_label.config(text=str(stats['checkin']))
-            self.stats_checkout_label.config(text=str(stats['checkout']))
-
-        karyawan_id = self._get_filter_karyawan_id()
-        logs = get_log_absensi(
-            filter_date=self.filter_date.get(),
-            filter_karyawan_id=karyawan_id,
-            filter_event=self.filter_event.get(),
-            limit=500
-        )
-
-        for log in logs:
-            timestamp_str = log['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
-            confidence_str = f"{log['confidence_score']:.4f}"
-            liveness_str = "Live" if log['status_liveness'] else "Spoof"
-            event_label = log['jenis_event'].upper()
-
-            tag = "checkin" if log['jenis_event'] == 'check-in' else "checkout"
-
-            self.tree.insert(
-                "",
-                tk.END,
-                values=(
-                    timestamp_str,
-                    log['nip'],
-                    log['nama'],
-                    log['jabatan'] or '-',
-                    event_label,
-                    confidence_str,
-                    liveness_str
-                ),
-                tags=(tag,)
-            )
-
-        self.info_label.config(
-            text=f"Menampilkan {len(logs)} log (max 500). "
-                 f"Filter: tanggal={self.filter_date.get()}, "
-                 f"event={self.filter_event.get()}"
-        )
-
-    def _on_reset_filter(self):
-        self.filter_date.set('today')
-        self.filter_karyawan.set('Semua Karyawan')
-        self.filter_event.set('all')
-        self._load_data()
+    def _refresh_all(self):
+        # Refresh manual → ikut catch-up resolve_pending kalau ada tanggal lampau
+        self._run_lazy_resolve()
+        self._load_karyawan_dropdown()
+        self._load_harian_data()
+        self._load_lewatan_data()
 
     def _on_export_csv(self):
-        items = self.tree.get_children()
+        if self.tabview.get() == "Absensi Harian":
+            self._export_tree_to_csv(self.h_tree, "absensi_harian",
+                                     ['Tanggal', 'NIP', 'Nama', 'Jabatan',
+                                      'Check-In', 'Check-Out', 'Status', 'Keterangan'])
+        else:
+            self._export_tree_to_csv(self.l_tree, "log_lewatan",
+                                     ['Timestamp', 'NIP', 'Nama', 'Jabatan',
+                                      'Event', 'Confidence', 'Liveness'])
+
+    def _export_tree_to_csv(self, tree, prefix, headers):
+        items = tree.get_children()
         if not items:
-            messagebox.showwarning(
-                "Tidak Ada Data",
-                "Tidak ada log untuk di-export.\n"
-                "Coba ubah filter terlebih dahulu."
-            )
+            messagebox.showwarning("Tidak Ada Data", "Tidak ada data untuk di-export.")
             return
 
-        default_filename = f"log_absensi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        default_filename = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         filepath = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            initialfile=default_filename,
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            defaultextension=".csv", initialfile=default_filename,
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
-
         if not filepath:
             return
 
         try:
             with open(filepath, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
-
-                writer.writerow([
-                    'Timestamp', 'NIP', 'Nama', 'Jabatan',
-                    'Event', 'Confidence Score', 'Status Liveness'
-                ])
-
+                writer.writerow(headers)
                 for item in items:
-                    values = self.tree.item(item)['values']
-                    writer.writerow(values)
-
-            messagebox.showinfo(
-                "Export Berhasil",
-                f"Log berhasil diexport ke:\n{filepath}\n\n"
-                f"Total: {len(items)} baris"
-            )
+                    writer.writerow(tree.item(item)['values'])
+            messagebox.showinfo("Export Berhasil",
+                f"Data berhasil diexport ke:\n{filepath}\n\nTotal: {len(items)} baris")
         except Exception as e:
-            messagebox.showerror(
-                "Export Gagal",
-                f"Gagal export CSV:\n{e}"
-            )
+            messagebox.showerror("Export Gagal", f"Gagal export CSV:\n{e}")
 
+    # ============================================================
+    # STYLE / WIDGETS
+    # ============================================================
 
-def open_log_absensi(parent):
-    LogAbsensiWindow(parent)
+    def _inline_combo(self, parent, variable, values, on_change, width=140):
+        """Combo box inline (tanpa label di atas) — versi slim filter bar"""
+        combo = ctk.CTkComboBox(
+            parent, variable=variable, values=values,
+            width=width, height=38, corner_radius=8,
+            font=ctk.CTkFont(size=11),
+            dropdown_font=ctk.CTkFont(size=11),
+            state="readonly",
+            border_width=1,
+            command=lambda _v: on_change(),
+        )
+        combo.pack(side="left", padx=(0, 8))
+        return combo
+
+    def _configure_tree_style(self, style_name):
+        style = ttk.Style()
+        is_dark = ctk.get_appearance_mode() == "Dark"
+
+        bg          = "#1f1f2e" if is_dark else "#ffffff"
+        row_even_bg = "#1f1f2e" if is_dark else "#ffffff"
+        row_odd_bg  = "#252535" if is_dark else "#f9fafb"  # zebra stripe
+        fg          = "#e5e7eb" if is_dark else "#111827"
+        head_bg     = "#2a2a3e" if is_dark else "#f3f4f6"
+        head_fg     = "#e5e7eb" if is_dark else "#374151"
+
+        style.theme_use('default')
+        style.configure(
+            style_name,
+            background=bg, foreground=fg, fieldbackground=bg,
+            rowheight=40, font=("Helvetica", 11), borderwidth=0,
+        )
+        style.configure(
+            f"{style_name}.Heading",
+            background=head_bg, foreground=head_fg,
+            font=("Helvetica", 10, "bold"),
+            relief="flat", padding=(12, 14),
+            borderwidth=0,
+        )
+        style.map(
+            style_name,
+            background=[('selected', ACCENT_BLUE)],
+            foreground=[('selected', '#ffffff')],
+        )
+        # Zebra row colors — pakai store untuk dipakai saat tag_configure
+        self._row_even_bg = row_even_bg
+        self._row_odd_bg = row_odd_bg

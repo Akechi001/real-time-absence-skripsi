@@ -41,6 +41,9 @@ class FaceDetector:
                 if 0.5 <= aspect_ratio <= 1.5:
                     faces.append([x1, y1, x2, y2, conf])
 
+        # Lepas Results object — punya .orig_img reference ke frame input,
+        # bisa numpuk kalau ultralytics internal cache aktif.
+        del results
         return faces
 
     def draw_faces(self, frame, faces):
