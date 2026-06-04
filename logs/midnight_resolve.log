@@ -51,3 +51,47 @@ Tidak ada tanggal yang butuh di-resolve (cek sampai 2026-05-30).
 === midnight_resolve mulai @ 2026-06-01T00:05:02.624568 ===
 Tidak ada tanggal yang butuh di-resolve (cek sampai 2026-05-31).
 === selesai @ 2026-06-01T00:05:02.789240 ===
+=== midnight_resolve mulai @ 2026-06-02T00:05:00.465397 ===
+Ditemukan 1 tanggal yang perlu di-resolve:
+  • 2026-06-01: 2 karyawan diproses
+--- Kirim payload rekap harian (2 baris baru) ---
+
+[PAYLOAD] {
+  "id_karyawan": 24,
+  "nama": "Enrico",
+  "tanggal": "2026-06-01",
+  "jam_masuk": "17:50:37",
+  "jam_pulang": "20:00:08",
+  "status_terlambat": true,
+  "status_pulang_cepat": false,
+  "keterangan": "terlambat",
+  "source": "face_recognition_system",
+  "jenis_payload": "rekap_harian"
+}
+--- Payload: 1 terkirim, 1 dilewati (tidak lengkap), 0 gagal ---
+=== selesai @ 2026-06-02T00:05:00.808351 (total insert: 2, durasi: 0.34s) ===
+=== midnight_resolve mulai @ 2026-06-03T00:05:04.894155 ===
+Ditemukan 1 tanggal yang perlu di-resolve:
+  • 2026-06-02: 1 karyawan diproses
+--- Kirim payload rekap harian (1 baris baru) ---
+
+[PAYLOAD] {
+  "id_karyawan": 25,
+  "nama": "Enrico Kevin",
+  "tanggal": "2026-06-02",
+  "jam_masuk": "10:48:50",
+  "jam_pulang": "14:41:27",
+  "status_terlambat": true,
+  "status_pulang_cepat": true,
+  "keterangan": "terlambat, pulang cepat",
+  "source": "face_recognition_system",
+  "jenis_payload": "rekap_harian"
+}
+--- Payload: 1 terkirim, 0 dilewati (tidak lengkap), 0 gagal ---
+=== selesai @ 2026-06-03T00:05:04.999003 (total insert: 1, durasi: 0.10s) ===
+=== midnight_resolve mulai @ 2026-06-04T00:05:05.921064 ===
+Ditemukan 1 tanggal yang perlu di-resolve:
+  • 2026-06-03: 1 karyawan diproses
+--- Kirim payload rekap harian (1 baris baru) ---
+--- Payload: 0 terkirim, 1 dilewati (tidak lengkap), 0 gagal ---
+=== selesai @ 2026-06-04T00:05:06.154122 (total insert: 1, durasi: 0.23s) ===

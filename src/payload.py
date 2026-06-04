@@ -6,7 +6,8 @@ from datetime import datetime
 
 def build_payload(id_karyawan, nama, jenis_event, confidence, status_liveness):
     """
-    Bangun payload JSON untuk simulasi integrasi backend.
+    Bangun struktur payload JSON yang menyerupai kebutuhan pencatatan
+    kehadiran, disiapkan untuk simulasi integrasi ke backend absensi kampus.
 
     jenis_event = 'passage' (lewatan mentah).
     Keputusan check-in / check-out / terlambat / pulang cepat dilakukan
@@ -26,10 +27,17 @@ def build_payload(id_karyawan, nama, jenis_event, confidence, status_liveness):
 
 
 def send_payload(payload):
-    """Kirim payload ke endpoint backend (simulasi)"""
+    """
+    Catat (log) payload yang telah dibentuk sebagai simulasi integrasi.
+
+    Sesuai ruang lingkup penelitian, sistem TIDAK melakukan pengiriman HTTP
+    nyata ke backend absensi kampus — payload hanya disiapkan & dicatat.
+    Blok requests.post di bawah disediakan sebagai jalur integrasi nyata
+    bila endpoint tersedia (di luar lingkup penelitian).
+    """
     print(f"\n[PAYLOAD] {json.dumps(payload, indent=2)}")
 
-    # Uncomment kalau ada endpoint nyata:
+    # Jalur integrasi nyata (di luar lingkup) — aktifkan bila endpoint tersedia:
     # import requests
     # try:
     #     response = requests.post(

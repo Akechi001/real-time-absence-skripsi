@@ -409,7 +409,7 @@ def get_karyawan_dropdown_list():
 # ABSENSI HARIAN (resolver tengah malam + UI)
 # ============================================================
 
-def resolve_attendance_for_date(tanggal):
+def resolve_attendance_for_date(tanggal, collect_records=False):
     """
     Resolve absensi harian untuk satu tanggal.
 
@@ -421,14 +421,20 @@ def resolve_attendance_for_date(tanggal):
     Idempotent via ON CONFLICT DO NOTHING; resolve_log selalu di-upsert
     supaya tanggal yang sudah dikerjakan tidak diproses ulang.
 
-    Returns: jumlah row absensi_harian yang baru di-insert.
+    Args:
+        collect_records: kalau True, kembalikan juga daftar baris yang BARU
+            di-insert (untuk pengiriman payload anti-duplikat oleh pemanggil).
+
+    Returns:
+        - collect_records=False (default): int jumlah row baru di-insert.
+        - collect_records=True: tuple (jumlah_baru, list_record_baru).
     """
     if isinstance(tanggal, str):
         tanggal = datetime.strptime(tanggal, "%Y-%m-%d").date()
 
     conn = get_connection()
     if not conn:
-        return 0
+        return (0, []) if collect_records else 0
 
     work_start = _parse_work_time(config.WORK_START_TIME)
     work_end = _parse_work_time(config.WORK_END_TIME)
@@ -439,6 +445,7 @@ def resolve_attendance_for_date(tanggal):
 
         query = """
             SELECT l.id_karyawan,
+                   k.nama,
                    MIN(l.timestamp) AS earliest,
                    MAX(l.timestamp) AS latest,
                    COUNT(*)         AS cnt
@@ -450,13 +457,14 @@ def resolve_attendance_for_date(tanggal):
         params = [tanggal]
         if only_internal:
             query += " AND k.jenis_karyawan = 'internal'"
-        query += " GROUP BY l.id_karyawan"
+        query += " GROUP BY l.id_karyawan, k.nama"
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
         inserted = 0
-        for id_karyawan, earliest, latest, cnt in rows:
+        new_records = []
+        for id_karyawan, nama, earliest, latest, cnt in rows:
             if cnt < 2:
                 check_in = None
                 check_out = None
@@ -486,6 +494,16 @@ def resolve_attendance_for_date(tanggal):
                   status_terlambat, status_pulang_cepat, keterangan))
             if cursor.rowcount > 0:
                 inserted += 1
+                new_records.append({
+                    'id_karyawan': id_karyawan,
+                    'nama': nama,
+                    'tanggal': tanggal,
+                    'check_in': check_in,
+                    'check_out': check_out,
+                    'status_terlambat': status_terlambat,
+                    'status_pulang_cepat': status_pulang_cepat,
+                    'keterangan': keterangan,
+                })
 
         cursor.execute("""
             INSERT INTO resolve_log (tanggal, karyawan_count)
@@ -496,11 +514,11 @@ def resolve_attendance_for_date(tanggal):
         """, (tanggal, len(rows)))
 
         conn.commit()
-        return inserted
+        return (inserted, new_records) if collect_records else inserted
     except Exception as e:
         print(f"Error resolve_attendance_for_date({tanggal}): {e}")
         conn.rollback()
-        return 0
+        return (0, []) if collect_records else 0
     finally:
         conn.close()
 
