@@ -1,0 +1,82 @@
+2026-06-01 16:13:14 [INFO] ============================================================
+2026-06-01 16:13:14 [INFO] Daemon mulai (PID 82750)
+2026-06-01 16:13:14 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 16:13:14 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 16:13:14 [INFO] Kamera override: index 0
+2026-06-01 16:13:14 [INFO] File STOP residual dihapus.
+2026-06-01 16:13:14 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-06-01 16:13:45 [INFO] [Iter 1] Subprocess exit code 0 setelah 30.7s
+2026-06-01 16:13:45 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 16:13:45 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 16:13:45 [INFO] ============================================================
+2026-06-01 17:49:12 [INFO] ============================================================
+2026-06-01 17:49:12 [INFO] Daemon mulai (PID 99954)
+2026-06-01 17:49:12 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 17:49:12 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 17:49:12 [INFO] Kamera override: index 0
+2026-06-01 17:49:12 [INFO] File STOP residual dihapus.
+2026-06-01 17:49:12 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-06-01 17:49:31 [INFO] [Iter 1] Subprocess exit code 0 setelah 19.3s
+2026-06-01 17:49:31 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 17:49:31 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 17:49:31 [INFO] ============================================================
+2026-06-01 17:50:27 [INFO] ============================================================
+2026-06-01 17:50:27 [INFO] Daemon mulai (PID 246)
+2026-06-01 17:50:27 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 17:50:27 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 17:50:27 [INFO] Kamera override: index 0
+2026-06-01 17:50:27 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 16.8 MB)
+2026-06-01 17:52:24 [INFO] [Iter 1] Subprocess exit code 0 setelah 117.4s
+2026-06-01 17:52:24 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 17:52:24 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 17:52:24 [INFO] ============================================================
+2026-06-01 18:11:23 [INFO] ============================================================
+2026-06-01 18:11:23 [INFO] Daemon mulai (PID 4284)
+2026-06-01 18:11:23 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 18:11:23 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 18:11:23 [INFO] Kamera override: index 0
+2026-06-01 18:11:23 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 17.1 MB)
+2026-06-01 18:14:14 [INFO] [Iter 1] Subprocess exit code 0 setelah 170.7s
+2026-06-01 18:14:14 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 18:14:14 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 18:14:14 [INFO] ============================================================
+2026-06-01 18:18:28 [INFO] ============================================================
+2026-06-01 18:18:28 [INFO] Daemon mulai (PID 5787)
+2026-06-01 18:18:28 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 18:18:28 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 18:18:28 [INFO] Kamera override: index 0
+2026-06-01 18:18:28 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-06-01 18:20:50 [INFO] [Iter 1] Subprocess exit code 0 setelah 141.8s
+2026-06-01 18:20:50 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 18:20:50 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 18:20:50 [INFO] ============================================================
+2026-06-01 18:31:35 [INFO] ============================================================
+2026-06-01 18:31:35 [INFO] Daemon mulai (PID 8287)
+2026-06-01 18:31:35 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 18:31:35 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 18:31:35 [INFO] Kamera override: index 0
+2026-06-01 18:31:35 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 16.9 MB)
+2026-06-01 18:31:56 [INFO] [Iter 1] Subprocess exit code 0 setelah 21.1s
+2026-06-01 18:31:56 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 18:31:56 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 18:31:56 [INFO] ============================================================
+2026-06-01 19:33:38 [INFO] ============================================================
+2026-06-01 19:33:38 [INFO] Daemon mulai (PID 20452)
+2026-06-01 19:33:38 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 19:33:38 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 19:33:38 [INFO] Kamera override: index 0
+2026-06-01 19:33:38 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 17.0 MB)
+2026-06-01 19:34:14 [INFO] [Iter 1] Subprocess exit code 0 setelah 36.0s
+2026-06-01 19:34:14 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 19:34:14 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 19:34:14 [INFO] ============================================================
+2026-06-01 19:59:55 [INFO] ============================================================
+2026-06-01 19:59:55 [INFO] Daemon mulai (PID 25731)
+2026-06-01 19:59:55 [INFO] Logs: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/attendance.log
+2026-06-01 19:59:55 [INFO] Stop file: /Users/kevin/IdeaProjects/real-time-absence-skripsi/logs/STOP (buat file ini untuk stop graceful)
+2026-06-01 19:59:55 [INFO] Kamera override: index 0
+2026-06-01 19:59:55 [INFO] [Iter 1] Spawning attendance subprocess... (daemon peak RSS: 17.1 MB)
+2026-06-01 20:00:11 [INFO] [Iter 1] Subprocess exit code 0 setelah 16.4s
+2026-06-01 20:00:11 [INFO] Exit code 0 (intentional stop). Daemon berhenti.
+2026-06-01 20:00:11 [INFO] Daemon selesai (total iterasi: 1)
+2026-06-01 20:00:11 [INFO] ============================================================
