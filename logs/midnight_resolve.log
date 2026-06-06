@@ -95,3 +95,25 @@ Ditemukan 1 tanggal yang perlu di-resolve:
 --- Kirim payload rekap harian (1 baris baru) ---
 --- Payload: 0 terkirim, 1 dilewati (tidak lengkap), 0 gagal ---
 === selesai @ 2026-06-04T00:05:06.154122 (total insert: 1, durasi: 0.23s) ===
+=== midnight_resolve mulai @ 2026-06-05T00:05:05.183076 ===
+Tidak ada tanggal yang butuh di-resolve (cek sampai 2026-06-04).
+=== selesai @ 2026-06-05T00:05:05.426841 ===
+=== midnight_resolve mulai @ 2026-06-06T00:05:05.559892 ===
+Ditemukan 1 tanggal yang perlu di-resolve:
+  • 2026-06-05: 1 karyawan diproses
+--- Kirim payload rekap harian (1 baris baru) ---
+
+[PAYLOAD] {
+  "id_karyawan": 25,
+  "nama": "Enrico Kevin",
+  "tanggal": "2026-06-05",
+  "jam_masuk": "00:26:12",
+  "jam_pulang": "00:38:16",
+  "status_terlambat": false,
+  "status_pulang_cepat": true,
+  "keterangan": "pulang cepat",
+  "source": "face_recognition_system",
+  "jenis_payload": "rekap_harian"
+}
+--- Payload: 1 terkirim, 0 dilewati (tidak lengkap), 0 gagal ---
+=== selesai @ 2026-06-06T00:05:05.648736 (total insert: 1, durasi: 0.09s) ===

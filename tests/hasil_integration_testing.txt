@@ -1,0 +1,22 @@
+========================================================================
+INTEGRATION TESTING — Titik sambung antar modul (Bab V)
+Database: absensi_test
+Dijalankan: 2026-06-05 11:09:41
+========================================================================
+
+[PASS] IT-05: struktur payload JSON benar (dibentuk & di-log, bukan HTTP)
+        → field lengkap & tipe benar: ['confidence_score', 'id_karyawan', 'jenis_event', 'keterangan', 'nama', 'source', 'status_liveness', 'timestamp', 'versi_model']; jenis_event='passage'; send_payload() jalan tanpa kirim HTTP (hanya log)
+[PASS] IT-06: resolver agregasi log → absensi_harian (check-in/out benar)
+        → 3 log → check_in=07:40:00 (MIN), check_out=16:50:00 (MAX), rows_inserted=1
+[PASS] IT-01: bbox YOLO dipetakan ke Face InsightFace yang overlap
+        → YOLO=1 face, InsightFace=1 face, overlap_area=166228px, embedding(get)==embedding(overlap) cosine=1.0000 (≈1 → wajah yang BENAR dipilih, bukan acak)
+[PASS] IT-02: embedding diteruskan ke cosine → identitas benar / tidak dikenali
+        → match: id=4 conf=1.000 (benar); vs template asing → None (tidak dikenali)
+[PASS] IT-03: match → cooldown dicek sebelum liveness (di-skip saat cooldown)
+        → process_frame → status='cooldown' (wajah dikenali lalu di-skip di gerbang cooldown, tidak lanjut ke liveness)
+[PASS] IT-04: gagal liveness TIDAK tercatat ke log_absensi
+        → frame statis → liveness Stage 1 gagal (status='spoofing'), log_absensi bertambah 0 baris (benar: tidak dicatat)
+
+========================================================================
+RINGKASAN: 6 PASS, 0 FAIL, 0 SKIP
+========================================================================

@@ -1,0 +1,4 @@
+threshold,genuine_total,frr_errors,frr_pct,impostor_total,far_errors,far_pct
+0.3,140,2,1.43,420,0,0.0
+0.4,140,5,3.57,420,0,0.0
+0.5,140,17,12.14,420,0,0.0

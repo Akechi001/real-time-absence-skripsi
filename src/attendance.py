@@ -1,6 +1,7 @@
 # src/attendance.py - Sistem absensi otomatis dengan anti-spoofing
 
 import cv2
+import csv
 import gc
 import time
 import threading
@@ -23,6 +24,14 @@ import config
 
 templates_lock = threading.Lock()
 shared_templates = []
+
+# Kolom CSV pengujian latensi per-modul (Bab V). Satu baris per wajah
+# yang diproses; kolom tahap yang tidak tercapai dibiarkan kosong.
+LATENCY_CSV_FIELDS = [
+    'timestamp', 'num_faces', 'exit_stage',
+    'yolo_ms', 'insightface_ms', 'embedding_ms', 'identify_ms',
+    'liveness_ms', 'antispoof_ms', 'total_ms',
+]
 
 
 class AttendanceSystem:
@@ -49,10 +58,29 @@ class AttendanceSystem:
             return False
         return time.time() - self.cooldown[id_karyawan] < config.COOLDOWN_SECONDS
 
-    def process_frame(self, frame, faces):
+    def _write_latency_row(self, row):
+        """Tulis satu baris breakdown latensi per-modul ke CSV (pengujian Bab V)."""
+        path = getattr(config, 'LATENCY_CSV_PATH', 'logs/latency_per_module.csv')
+        try:
+            dirname = os.path.dirname(path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            write_header = (not os.path.exists(path)) or os.path.getsize(path) == 0
+            with open(path, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=LATENCY_CSV_FIELDS)
+                if write_header:
+                    writer.writeheader()
+                writer.writerow(row)
+        except Exception as e:
+            print(f"⚠️ gagal tulis latency CSV: {e}")
+
+    def process_frame(self, frame, faces, t_yolo=0.0):
         """
         Sequential pipeline:
         YOLO → ArcFace → Liveness Stage 1 (EAR/head) → Liveness Stage 2 (CNN) → Log
+
+        t_yolo: durasi deteksi YOLO (detik) dari pemanggil, supaya bisa ikut
+        dicatat di CSV latensi per-modul.
         """
         t_start = time.time()
 
@@ -68,112 +96,142 @@ class AttendanceSystem:
         with templates_lock:
             current_templates = list(shared_templates)
 
+        latency_log = getattr(config, 'LATENCY_CSV_LOG', False)
+
         for i, face_bbox in enumerate(faces):
-            # 1. Ekstraksi embedding ArcFace
-            t1 = time.time()
-            embedding = self.recognizer.get_embedding(
-                frame, [int(x) for x in face_bbox[:4]], faces_insightface
-            )
-            t_embedding = time.time() - t1
+            # Timer per tahap; None artinya tahap tak tercapai untuk wajah ini.
+            t_embedding = t_identify = t_liveness = t_antispoof = None
+            exit_stage = 'error'
+            try:
+                # 1. Ekstraksi embedding ArcFace
+                t1 = time.time()
+                embedding = self.recognizer.get_embedding(
+                    frame, [int(x) for x in face_bbox[:4]], faces_insightface
+                )
+                t_embedding = time.time() - t1
 
-            if embedding is None:
-                continue
+                if embedding is None:
+                    exit_stage = 'no_embedding'
+                    continue
 
-            # 2. Pencocokan identitas
-            result = self.recognizer.identify(embedding, current_templates)
-            if result is None:
-                results.append({
-                    'status': 'unknown',
-                    'message': 'Wajah tidak dikenali'
-                })
-                continue
+                # 2. Pencocokan identitas
+                t1 = time.time()
+                result = self.recognizer.identify(embedding, current_templates)
+                t_identify = time.time() - t1
+                if result is None:
+                    exit_stage = 'unknown'
+                    results.append({
+                        'status': 'unknown',
+                        'message': 'Wajah tidak dikenali'
+                    })
+                    continue
 
-            id_karyawan = result['id_karyawan']
-            nama = result['nama']
-            confidence = result['confidence']
+                id_karyawan = result['id_karyawan']
+                nama = result['nama']
+                confidence = result['confidence']
 
-            # 3. Cek cooldown
-            if self.is_cooldown(id_karyawan):
-                results.append({
-                    'status': 'cooldown',
-                    'nama': nama,
-                    'message': f'Cooldown: {nama}'
-                })
-                continue
+                # 3. Cek cooldown
+                if self.is_cooldown(id_karyawan):
+                    exit_stage = 'cooldown'
+                    results.append({
+                        'status': 'cooldown',
+                        'nama': nama,
+                        'message': f'Cooldown: {nama}'
+                    })
+                    continue
 
-            # 4. Liveness Stage 1 — EAR + head movement
-            t1 = time.time()
-            face_obj = faces_insightface[i] if i < len(faces_insightface) else None
-            is_live, _ = self.liveness.check_liveness(i, face_obj)
-            t_liveness = time.time() - t1
+                # 4. Liveness Stage 1 — EAR + head movement
+                t1 = time.time()
+                face_obj = faces_insightface[i] if i < len(faces_insightface) else None
+                is_live, _ = self.liveness.check_liveness(i, face_obj)
+                t_liveness = time.time() - t1
 
-            if not is_live:
-                print(f"✗ LIVENESS STAGE 1: GAGAL - tidak ada gerakan kepala/kedipan ({nama})")
-                t_total = time.time() - t_start
-                print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms liveness={t_liveness*1000:.0f}ms total={t_total*1000:.0f}ms")
-                results.append({
-                    'status': 'spoofing',
-                    'nama': nama,
-                    'message': 'Liveness gagal — gerakkan kepala'
-                })
-                continue
+                if not is_live:
+                    exit_stage = 'liveness_fail'
+                    print(f"✗ LIVENESS STAGE 1: GAGAL - tidak ada gerakan kepala/kedipan ({nama})")
+                    t_total = time.time() - t_start
+                    print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms identify={t_identify*1000:.0f}ms liveness={t_liveness*1000:.0f}ms total={t_total*1000:.0f}ms")
+                    results.append({
+                        'status': 'spoofing',
+                        'nama': nama,
+                        'message': 'Liveness gagal — gerakkan kepala'
+                    })
+                    continue
 
-            print(f"✓ LIVENESS STAGE 1: LOLOS ({nama})")
+                print(f"✓ LIVENESS STAGE 1: LOLOS ({nama})")
 
-            # 5. Liveness Stage 2 — Anti-spoofing CNN
-            t1 = time.time()
-            is_real, spoof_conf = self.anti_spoofing.predict(frame, face_bbox)
-            t_antispoof = time.time() - t1
+                # 5. Liveness Stage 2 — Anti-spoofing CNN
+                t1 = time.time()
+                is_real, spoof_conf = self.anti_spoofing.predict(frame, face_bbox)
+                t_antispoof = time.time() - t1
 
-            if is_real and spoof_conf >= config.ANTI_SPOOFING_THRESHOLD:
-                print(f"✓ ANTI-SPOOF: WAJAH ASLI - confidence={spoof_conf:.3f} ({nama})")
-            else:
-                if not is_real:
-                    reason = "TERDETEKSI FOTO/SCREEN/SPOOF"
+                if is_real and spoof_conf >= config.ANTI_SPOOFING_THRESHOLD:
+                    print(f"✓ ANTI-SPOOF: WAJAH ASLI - confidence={spoof_conf:.3f} ({nama})")
                 else:
-                    reason = f"CONFIDENCE RENDAH ({spoof_conf:.3f})"
-                print(f"✗ ANTI-SPOOF: SPOOFING - {reason} ({nama})")
+                    exit_stage = 'spoof'
+                    if not is_real:
+                        reason = "TERDETEKSI FOTO/SCREEN/SPOOF"
+                    else:
+                        reason = f"CONFIDENCE RENDAH ({spoof_conf:.3f})"
+                    print(f"✗ ANTI-SPOOF: SPOOFING - {reason} ({nama})")
+                    t_total = time.time() - t_start
+                    print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms identify={t_identify*1000:.0f}ms liveness={t_liveness*1000:.0f}ms antispoof={t_antispoof*1000:.0f}ms total={t_total*1000:.0f}ms")
+
+                    results.append({
+                        'status': 'spoofing',
+                        'nama': nama,
+                        'message': f'Spoofing terdeteksi (conf: {spoof_conf:.2f})'
+                    })
+                    continue
+
+                # 6. Simpan log absensi sebagai 'passage' (raw lewatan).
+                #    Keputusan check-in/check-out + status terlambat/pulang cepat
+                #    dilakukan batch tengah malam oleh resolve_attendance_for_date().
+                save_log_absensi(
+                    id_karyawan=id_karyawan,
+                    jenis_event='passage',
+                    confidence_score=confidence,
+                    status_liveness=is_live
+                )
+
+                # 7. Kirim payload
+                passage_time = time.strftime('%H:%M:%S')
+                payload = build_payload(
+                    id_karyawan, nama, 'passage', confidence, is_live
+                )
+                send_payload(payload)
+
+                # 8. Set cooldown dan reset liveness
+                self.cooldown[id_karyawan] = time.time()
+                self.liveness.reset_state(i)
+
                 t_total = time.time() - t_start
-                print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms liveness={t_liveness*1000:.0f}ms antispoof={t_antispoof*1000:.0f}ms total={t_total*1000:.0f}ms")
+                print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms identify={t_identify*1000:.0f}ms liveness={t_liveness*1000:.0f}ms antispoof={t_antispoof*1000:.0f}ms total={t_total*1000:.0f}ms")
 
+                exit_stage = 'success'
                 results.append({
-                    'status': 'spoofing',
+                    'status': 'success',
+                    'id_karyawan': id_karyawan,
                     'nama': nama,
-                    'message': f'Spoofing terdeteksi (conf: {spoof_conf:.2f})'
+                    'confidence': confidence,
+                    'passage_time': passage_time,
                 })
-                continue
-
-            # 6. Simpan log absensi sebagai 'passage' (raw lewatan).
-            #    Keputusan check-in/check-out + status terlambat/pulang cepat
-            #    dilakukan batch tengah malam oleh resolve_attendance_for_date().
-            save_log_absensi(
-                id_karyawan=id_karyawan,
-                jenis_event='passage',
-                confidence_score=confidence,
-                status_liveness=is_live
-            )
-
-            # 7. Kirim payload
-            passage_time = time.strftime('%H:%M:%S')
-            payload = build_payload(
-                id_karyawan, nama, 'passage', confidence, is_live
-            )
-            send_payload(payload)
-
-            # 8. Set cooldown dan reset liveness
-            self.cooldown[id_karyawan] = time.time()
-            self.liveness.reset_state(i)
-
-            t_total = time.time() - t_start
-            print(f"⏱️ TIMING: insightface={t_insightface*1000:.0f}ms embed={t_embedding*1000:.0f}ms liveness={t_liveness*1000:.0f}ms antispoof={t_antispoof*1000:.0f}ms total={t_total*1000:.0f}ms")
-
-            results.append({
-                'status': 'success',
-                'id_karyawan': id_karyawan,
-                'nama': nama,
-                'confidence': confidence,
-                'passage_time': passage_time,
-            })
+            finally:
+                if latency_log:
+                    def _ms(v):
+                        return round(v * 1000, 2) if v is not None else ''
+                    self._write_latency_row({
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'num_faces': len(faces),
+                        'exit_stage': exit_stage,
+                        'yolo_ms': round(t_yolo * 1000, 2),
+                        'insightface_ms': round(t_insightface * 1000, 2),
+                        'embedding_ms': _ms(t_embedding),
+                        'identify_ms': _ms(t_identify),
+                        'liveness_ms': _ms(t_liveness),
+                        'antispoof_ms': _ms(t_antispoof),
+                        'total_ms': round((time.time() - t_start) * 1000, 2),
+                    })
 
         # Lepas list Face object InsightFace — tiap Face simpan embedding +
         # landmark 2D/3D + bbox + kps (~15-20KB). Tanpa ini ref bisa tertahan
@@ -235,7 +293,7 @@ class AttendanceSystem:
                 if faces:
                     print(f"⏱️ YOLO detect: {t_yolo*1000:.0f}ms")
 
-                results = self.process_frame(frame, faces)
+                results = self.process_frame(frame, faces, t_yolo=t_yolo)
 
                 with display_lock:
                     display_state['last_faces'] = faces

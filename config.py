@@ -37,7 +37,21 @@ FRAME_HEIGHT = 480
 FPS_SAMPLING = 20
 
 # Cooldown absensi (detik)
-COOLDOWN_SECONDS = 60
+# ⚠️ SESI PENGUJIAN BAB V: di-set 0 supaya tiap frame menjalankan pipeline
+# PENUH (liveness + anti-spoofing ikut terukur). KEMBALIKAN ke 60 setelah
+# semua sesi pengujian selesai (Fase 8).
+COOLDOWN_SECONDS = 0
+
+# Pengujian latensi per-modul (Bab V).
+# Kalau True, tiap wajah yang diproses dicatat breakdown waktunya
+# (YOLO, InsightFace, embedding, identify, liveness, anti-spoofing) ke CSV.
+# HANYA aktifkan saat sesi pengukuran latensi; matikan di produksi supaya
+# tidak menulis file terus-menerus.
+# ⚠️ SESI PENGUJIAN BAB V: di-set True untuk mencatat latensi. Kembalikan ke
+# False setelah sesi pengukuran selesai supaya produksi tidak menulis CSV terus.
+# (Fase latensi SELESAI — dimatikan agar sesi enroll/absen tidak mencemari CSV.)
+LATENCY_CSV_LOG = False
+LATENCY_CSV_PATH = "logs/latency_per_module.csv"
 
 # Path
 PHOTOS_DIR = "data/photos"

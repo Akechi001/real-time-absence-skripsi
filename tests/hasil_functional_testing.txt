@@ -1,15 +1,15 @@
 ========================================================================
 FUNCTIONAL TESTING — Sistem Absensi Wajah
 STIE Ciputra Makassar — Skripsi Enrico Kevin Ariantho (0806022210012)
-Dijalankan: 2026-05-28 16:23:22
+Dijalankan: 2026-06-05 23:00:01
 ========================================================================
 
 Pre-test cleanup: done
 
 [PASS] TC-01: Enroll karyawan baru valid
-        → id_karyawan=18, nip=TEST_REL_001, status_aktif=True
+        → id_karyawan=16, nip=TEST_REL_001, status_aktif=True
 [PASS] TC-02: Enroll dengan NIP duplikat ditolak
-        → insert#1 id=19, insert#2 rejected (returned None)
+        → insert#1 id=17, insert#2 rejected (returned None)
 [PASS] TC-03: NIP dengan huruf/simbol ditolak (UI validation)
         → invalid ['ABC123', '12.34', '12-345', 'abc'] → rejected; valid ['123456', '0001', '1'] → accepted
 [PASS] TC-04: Resolver agregat MIN(timestamp)=check_in, MAX=check_out
@@ -25,7 +25,7 @@ Pre-test cleanup: done
 [PASS] TC-09: get_log_absensi() schema sesuai
         → required keys present: ['confidence_score', 'id_karyawan', 'id_log', 'jenis_event', 'status_liveness', 'timestamp'], actual keys: ['confidence_score', 'id_karyawan', 'id_log', 'jabatan', 'jenis_event', 'keterangan', 'nama', 'nip', 'status_liveness', 'timestamp']
 [PASS] TC-10: get_absensi_harian_stats() return numeric dict
-        → keys=['pulang_cepat', 'terlambat', 'tidak_lengkap', 'total'], values={'total': 22, 'terlambat': 10, 'pulang_cepat': 7, 'tidak_lengkap': 8}
+        → keys=['pulang_cepat', 'terlambat', 'tidak_lengkap', 'total'], values={'total': 2, 'terlambat': 1, 'pulang_cepat': 0, 'tidak_lengkap': 1}
 
 Post-test cleanup: done
 
