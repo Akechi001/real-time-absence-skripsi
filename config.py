@@ -14,10 +14,17 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWORD", "")
 }
 
+# ── Device global (CPU / GPU) ─────────────────────────────────────────
+# Toggle TUNGGAL untuk semua model (YOLO, InsightFace, anti-spoofing).
+#   "cpu" : semua di CPU (default, kondisi terdeploy)
+#   "gpu" : Apple Silicon → MPS (YOLO & PyTorch) + CoreML (ONNX/InsightFace)
+# Untuk eksperimen latensi GPU: set "gpu", jalankan, lalu kembalikan "cpu".
+DEVICE = "gpu"
+
 # YOLO26
 YOLO_MODEL_PATH = "yolo26n_face.pt"
 YOLO_CONFIDENCE = 0.5
-YOLO_DEVICE = "cpu"
+YOLO_DEVICE = "cpu"   # legacy — sekarang diturunkan dari DEVICE di face_detector
 
 # InsightFace
 INSIGHTFACE_MODEL = "buffalo_l"
@@ -50,8 +57,8 @@ COOLDOWN_SECONDS = 0
 # ⚠️ SESI PENGUJIAN BAB V: di-set True untuk mencatat latensi. Kembalikan ke
 # False setelah sesi pengukuran selesai supaya produksi tidak menulis CSV terus.
 # (Fase latensi SELESAI — dimatikan agar sesi enroll/absen tidak mencemari CSV.)
-LATENCY_CSV_LOG = False
-LATENCY_CSV_PATH = "logs/latency_per_module.csv"
+LATENCY_CSV_LOG = True
+LATENCY_CSV_PATH = "logs/latency_gpu.csv"   # GPU run — pisah dari data CPU (latency_per_module.csv)
 
 # Path
 PHOTOS_DIR = "data/photos"

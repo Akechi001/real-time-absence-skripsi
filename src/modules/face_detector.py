@@ -11,8 +11,8 @@ class FaceDetector:
     def __init__(self):
         self.model = YOLO(config.YOLO_MODEL_PATH)
         self.confidence = config.YOLO_CONFIDENCE
-        self.device = config.YOLO_DEVICE
-        print("✓ FaceDetector initialized")
+        self.device = "mps" if getattr(config, 'DEVICE', 'cpu') == "gpu" else "cpu"
+        print(f"✓ FaceDetector initialized (device={self.device})")
 
     def detect(self, frame):
         """

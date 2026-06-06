@@ -47,7 +47,11 @@ def get_kernel(height, width):
 class AntiSpoofingDetector:
     def __init__(self, model_dir="models/anti_spoofing"):
         """Load semua model anti-spoofing dari folder"""
-        self.device = torch.device("cpu")
+        if getattr(config, 'DEVICE', 'cpu') == 'gpu' and torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
+        print(f"✓ AntiSpoofingDetector device: {self.device}")
         self.models = []
 
         for model_name in os.listdir(model_dir):

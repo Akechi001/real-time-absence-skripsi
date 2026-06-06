@@ -20,14 +20,20 @@ class FaceRecognizer:
         # detection: untuk deteksi wajah
         # recognition: untuk embedding ArcFace
         # landmark_2d_106: untuk liveness EAR + head movement
+        # CATATAN: CoreMLExecutionProvider TIDAK kompatibel dengan model deteksi
+        # SCRFD InsightFace — crash runtime ("CoreML static output shape mismatch",
+        # rank berbeda). Jadi InsightFace TETAP di CPU walau DEVICE='gpu'.
+        # Hanya YOLO & anti-spoofing yang dipercepat lewat MPS.
+        providers = ['CPUExecutionProvider']
         self.app = insightface.app.FaceAnalysis(
             name=config.INSIGHTFACE_MODEL,
-            allowed_modules=['detection', 'recognition', 'landmark_2d_106']
+            allowed_modules=['detection', 'recognition', 'landmark_2d_106'],
+            providers=providers,
         )
         # det_size lebih kecil untuk speed up (default 640x640)
         self.app.prepare(ctx_id=-1, det_size=(320, 320))
         self.threshold = config.FACE_SIMILARITY_THRESHOLD
-        print("✓ FaceRecognizer initialized")
+        print(f"✓ FaceRecognizer initialized (providers={providers}, CPU-only)")
 
     def get_embedding(self, frame, bbox, faces_insightface=None):
         """
